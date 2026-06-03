@@ -29,6 +29,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { CodeEditor } from "../../components/CodeEditor";
+import { ModalShell } from "../../components/ModalShell";
 
 // ─── 工具分类注册表 ───
 
@@ -505,140 +506,118 @@ export function ResourceManager() {
       </div>
 
       {/* 详情 Modal */}
-      <Modal.Backdrop isOpen={detailOpen} onOpenChange={setDetailOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-2xl">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{detailItem?.name || "资源详情"}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="h-80 min-h-0">
-                <CodeEditor
-                  value={detailItem?.content || ""}
-                  language="html"
-                  readOnly
-                />
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                关闭
-              </Button>
-              {detailItem && (
-                <Button
-                  slot="close"
-                  variant="danger"
-                  onPress={() => handleDelete(detailItem._key)}
-                >
-                  删除
-                </Button>
-              )}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <ModalShell
+        isOpen={detailOpen}
+        onOpenChange={setDetailOpen}
+        title={detailItem?.name || "资源详情"}
+        icon={Eye}
+        width="sm:max-w-2xl"
+      >
+        <div className="h-80 min-h-0">
+          <CodeEditor
+            value={detailItem?.content || ""}
+            language="html"
+            readOnly
+          />
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" onPress={() => setDetailOpen(false)}>
+            关闭
+          </Button>
+          {detailItem && (
+            <Button
+              variant="danger"
+              onPress={() => { handleDelete(detailItem._key); setDetailOpen(false); }}
+            >
+              删除
+            </Button>
+          )}
+        </div>
+      </ModalShell>
 
       {/* 新建 Modal */}
-      <Modal.Backdrop
+      <ModalShell
         isOpen={createModalOpen}
         onOpenChange={setCreateModalOpen}
+        title="新建资源"
+        icon={Plus}
+        width="sm:max-w-2xl"
       >
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-2xl">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>新建资源</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="space-y-4">
-                <TextField value={newName} onChange={setNewName}>
-                  <Label>名称</Label>
-                  <Input placeholder="资源名称" />
-                </TextField>
-                <div>
-                  <Label className="text-xs text-muted mb-2 block">内容</Label>
-                  <div className="h-64 border border-separator rounded-lg overflow-hidden">
-                    <CodeEditor
-                      value={newContent}
-                      onChange={setNewContent}
-                      language="html"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                取消
-              </Button>
-              <Button
-                slot="close"
-                onPress={handleCreate}
-                isDisabled={!newName.trim() || !newContent.trim()}
-              >
-                创建
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+        <div className="space-y-4">
+          <TextField value={newName} onChange={setNewName}>
+            <Label>名称</Label>
+            <Input placeholder="资源名称" />
+          </TextField>
+          <div>
+            <Label className="text-xs text-muted mb-2 block">内容</Label>
+            <div className="h-64 border border-separator rounded-lg overflow-hidden">
+              <CodeEditor
+                value={newContent}
+                onChange={setNewContent}
+                language="html"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" onPress={() => setCreateModalOpen(false)}>
+            取消
+          </Button>
+          <Button
+            onPress={handleCreate}
+            isDisabled={!newName.trim() || !newContent.trim()}
+          >
+            创建
+          </Button>
+        </div>
+      </ModalShell>
 
       {/* 导入 Modal */}
-      <Modal.Backdrop
+      <ModalShell
         isOpen={importModalOpen}
         onOpenChange={setImportModalOpen}
+        title="导入资源"
+        icon={Upload}
+        width="sm:max-w-md"
       >
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-md">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>导入资源</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {importPreview && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted">
-                    检测到{" "}
-                    <span className="text-foreground font-medium">
-                      {importPreview.count}
-                    </span>{" "}
-                    条资源
-                  </p>
-                  <div className="max-h-40 overflow-y-auto rounded-lg bg-surface-secondary divide-y divide-separator">
-                    {importPreview.keys.map((key) => (
-                      <div
-                        key={key}
-                        className="px-3 py-2 text-xs font-mono text-muted"
-                      >
-                        {key}
-                      </div>
-                    ))}
-                  </div>
+        {importPreview && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              检测到{" "}
+              <span className="text-foreground font-medium">
+                {importPreview.count}
+              </span>{" "}
+              条资源
+            </p>
+            <div className="max-h-40 overflow-y-auto rounded-lg bg-surface-secondary divide-y divide-separator">
+              {importPreview.keys.map((key) => (
+                <div
+                  key={key}
+                  className="px-3 py-2 text-xs font-mono text-muted"
+                >
+                  {key}
                 </div>
-              )}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                取消
-              </Button>
-              <Button
-                slot="close"
-                variant="ghost"
-                onPress={() => handleImportConfirm("merge")}
-              >
-                合并
-              </Button>
-              <Button
-                slot="close"
-                onPress={() => handleImportConfirm("overwrite")}
-              >
-                覆盖
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" onPress={() => setImportModalOpen(false)}>
+            取消
+          </Button>
+          <Button
+            variant="ghost"
+            onPress={() => handleImportConfirm("merge")}
+          >
+            合并
+          </Button>
+          <Button
+            onPress={() => handleImportConfirm("overwrite")}
+          >
+            覆盖
+          </Button>
+        </div>
+      </ModalShell>
     </div>
   );
 }

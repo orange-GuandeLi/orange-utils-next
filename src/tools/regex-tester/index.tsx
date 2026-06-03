@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button, Chip, Tooltip, Input, toast } from "@heroui/react";
-import { Regex, Copy, Check, Save, FolderOpen, Trash2, FileDown, Plus } from "lucide-react";
+import { Regex, Copy, Check, Plus } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { LoadModal } from "../../components/LoadModal";
 import { SaveModal } from "../../components/SaveModal";
+import { ToolHeader } from "../../components/ToolHeader";
+import { ToolActionButtons } from "../../components/ToolActionButtons";
 import { ModalShell } from "../../components/ModalShell";
 
 type MatchResult = {
@@ -269,53 +271,27 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
       {/* Header */}
-      <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
-        <Regex size={16} className="text-accent" />
-        <h1 className="text-sm font-semibold">正则测试</h1>
-        <span className="text-xs text-muted">实时匹配，高亮显示</span>
-        <div className="flex-1" />
-        <Chip size="sm" variant="soft" color={error ? "danger" : "success"}>
-          <Chip.Label className="text-xs">
-            {error ? "语法错误" : pattern ? `${matches.length} 个匹配` : "输入正则"}
-          </Chip.Label>
-        </Chip>
-        {currentName && (
-          <Chip size="sm" variant="soft" color="accent" className="max-w-[120px] truncate">
-            <Chip.Label className="text-xs">{currentName}</Chip.Label>
-          </Chip>
-        )}
-        {dirty && (
-          <Chip size="sm" variant="soft" color="warning">
-            <Chip.Label>未保存</Chip.Label>
-          </Chip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
-              <Save size={14} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{currentName ? `保存「${currentName}」` : "保存正则"}</Tooltip.Content>
-        </Tooltip>
-        {currentName && (
-          <Tooltip delay={0}>
-            <Tooltip.Trigger className="flex flex-col">
-              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
-                <FileDown size={14} />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>另存为</Tooltip.Content>
-          </Tooltip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
-              <FolderOpen size={14} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>加载正则</Tooltip.Content>
-        </Tooltip>
-      </header>
+      <ToolHeader
+        icon={Regex}
+        title="正则测试"
+        subtitle="实时匹配，高亮显示"
+        extra={
+          <>
+            <Chip size="sm" variant="soft" color={error ? "danger" : "success"}>
+              <Chip.Label className="text-xs">
+                {error ? "语法错误" : pattern ? `${matches.length} 个匹配` : "输入正则"}
+              </Chip.Label>
+            </Chip>
+            <ToolActionButtons
+              currentName={currentName}
+              dirty={dirty}
+              onSave={handleSave}
+              onSaveAs={handleSaveAs}
+              onLoad={() => setLoadModalOpen(true)}
+            />
+          </>
+        }
+      />
 
       {/* 正则输入 */}
       <div className="px-5 py-3 border-b border-separator bg-surface">

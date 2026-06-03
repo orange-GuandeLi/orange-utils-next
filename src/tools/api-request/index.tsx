@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Modal, Input, Label, TextField, Select, ListBox, Tabs, toast } from "@heroui/react";
+import { Button, Chip, Tooltip, Input, Label, TextField, Select, ListBox, Tabs, toast } from "@heroui/react";
 import { Send, Save, FolderOpen, Trash2, Plus, X, Copy, Check, FileDown } from "lucide-react";
+import { ToolHeader } from "../../components/ToolHeader";
+import { ToolActionButtons } from "../../components/ToolActionButtons";
 import { LoadModal } from "../../components/LoadModal";
 import { SaveModal } from "../../components/SaveModal";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
@@ -190,42 +192,21 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
-      {/* Header */}
-      <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
-        <h1 className="text-sm font-semibold">API 请求</h1>
-        <span className="text-xs text-muted">发送 HTTP 请求，支持模板变量引用其他工具的数据</span>
-        <div className="flex-1" />
-        {currentName && (
-          <Chip size="sm" variant="soft" color="accent">
-            <Chip.Label>{currentName}</Chip.Label>
-          </Chip>
-        )}
-        {dirty && (
-          <Chip size="sm" variant="soft" color="warning">
-            <Chip.Label>未保存</Chip.Label>
-          </Chip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}><Save size={14} /></Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{currentName ? `保存到 ${currentName}` : "保存请求"}</Tooltip.Content>
-        </Tooltip>
-        {currentName && (
-          <Tooltip delay={0}>
-            <Tooltip.Trigger className="flex flex-col">
-              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}><FileDown size={14} /></Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>另存为</Tooltip.Content>
-          </Tooltip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}><FolderOpen size={14} /></Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>加载请求</Tooltip.Content>
-        </Tooltip>
-      </header>
+      <ToolHeader
+        icon={Send}
+        title="API 请求"
+        subtitle="发送 HTTP 请求，支持模板变量引用其他工具的数据"
+        extra={
+          <ToolActionButtons
+            currentName={currentName}
+            dirty={dirty}
+            onSave={handleSave}
+            onSaveAs={handleSaveAs}
+            onLoad={() => setLoadModalOpen(true)}
+            saveTooltip={currentName ? `保存到 ${currentName}` : "保存请求"}
+          />
+        }
+      />
 
       {/* Main */}
       <div className="flex-1 flex min-h-0 overflow-hidden">

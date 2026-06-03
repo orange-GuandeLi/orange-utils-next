@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Modal, Input, Label, TextField, toast } from "@heroui/react";
+import { Button, Chip, Tooltip, Input, Label, TextField, toast } from "@heroui/react";
 import {
   SquareDashedMousePointer,
   Copy,
@@ -7,10 +7,9 @@ import {
   Eye,
   GripVertical,
   Check,
-  Save,
-  FolderOpen,
-  FileDown,
 } from "lucide-react";
+import { ToolHeader } from "../../components/ToolHeader";
+import { ToolActionButtons } from "../../components/ToolActionButtons";
 import { CodeEditor } from "./CodeEditor";
 import {
   useIframeSelector,
@@ -19,6 +18,7 @@ import {
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { LoadModal } from "../../components/LoadModal";
 import { SaveModal } from "../../components/SaveModal";
+import { ModalShell } from "../../components/ModalShell";
 
 // 保存的数据结构
 type SavedItem = {
@@ -227,45 +227,28 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
       {/* Header */}
-      <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
-        <h1 className="text-sm font-semibold">HTML 选择器</h1>
-        <span className="text-xs text-muted">
-          粘贴 HTML → 实时预览 → 选择元素 → 查看信息
-        </span>
-        <div className="flex-1" />
-        {currentName && (
-          <Chip size="sm" variant="soft" color="default">
-            <Chip.Label>{currentName}</Chip.Label>
-          </Chip>
-        )}
-        {dirty && (
-          <Chip size="sm" variant="soft" color="warning">
-            <Chip.Label>未保存</Chip.Label>
-          </Chip>
-        )}
-        <Chip size="sm" variant="soft" color="default" className="font-mono">
-          <Chip.Label>{previewPx}px</Chip.Label>
-        </Chip>
-        <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
-            <Save size={14} />
-          </Button>
-          <Tooltip.Content>{currentName ? `覆盖保存「${currentName}」` : "保存"}</Tooltip.Content>
-        </Tooltip>
-        {currentName && (
-          <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
-              <FileDown size={14} />
-            </Button>
-            <Tooltip.Content>另存为</Tooltip.Content>
-          </Tooltip>
-        )}
-        <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
-            <FolderOpen size={14} />
-          </Button>
-          <Tooltip.Content>加载</Tooltip.Content>
-        </Tooltip>
+      <ToolHeader
+        icon={Code2}
+        title="HTML 选择器"
+        subtitle="粘贴 HTML → 实时预览 → 选择元素 → 查看信息"
+        extra={
+          <>
+            <ToolActionButtons
+              currentName={currentName}
+              dirty={dirty}
+              onSave={handleSave}
+              onSaveAs={handleSaveAs}
+              onLoad={() => setLoadModalOpen(true)}
+            />
+            <Chip size="sm" variant="soft" color="default" className="font-mono">
+              <Chip.Label>{previewPx}px</Chip.Label>
+            </Chip>
+          </>
+        }
+      />
+
+      {/* Tool-specific controls */}
+      <div className="flex items-center gap-2 px-5 py-2 border-b border-separator shrink-0">
         <Button
           size="sm"
           className="text-xs"
@@ -298,7 +281,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
             <Tooltip.Content>查看选中信息</Tooltip.Content>
           </Tooltip>
         )}
-      </header>
+      </div>
 
       {/* Main */}
       <div ref={setContainerRef} className="flex-1 flex min-h-0 relative select-none">
@@ -354,37 +337,30 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
 
       {/* 选中信息 Modal */}
       {selectedInfo && (
-        <Modal.Backdrop isOpen={modalOpen} onOpenChange={setModalOpen}>
-          <Modal.Container>
-            <Modal.Dialog className="sm:max-w-lg">
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Icon className="bg-success-soft text-success">
-                  <Eye className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>选中元素信息</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <div className="divide-y divide-separator">
-                  <CopyField label="选择器" value={selectedInfo.selector} />
-                  <CopyField label="标签" value={selectedInfo.tagName} />
-                  <CopyField label="ID" value={selectedInfo.id} />
-                  <CopyField label="类名" value={selectedInfo.className} />
-                  <CopyField label="尺寸" value={`${selectedInfo.rect.width} × ${selectedInfo.rect.height}`} />
-                  <CopyField label="位置" value={`top=${selectedInfo.rect.top}, left=${selectedInfo.rect.left}`} />
-                  {selectedInfo.editableType && (
-                    <>
-                      <CopyField label="可编辑" value={selectedInfo.editableType} />
-                      <CopyField label="值" value={selectedInfo.editableValue || ""} />
-                    </>
-                  )}
-                  <CopyField label="文本" value={selectedInfo.textContent} />
-                  <CopyField label="outerHTML" value={selectedInfo.outerHTML} />
-                </div>
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
+        <ModalShell
+          isOpen={modalOpen}
+          onOpenChange={setModalOpen}
+          title="选中元素信息"
+          icon={Eye}
+          width="sm:max-w-lg"
+        >
+          <div className="divide-y divide-separator">
+            <CopyField label="选择器" value={selectedInfo.selector} />
+            <CopyField label="标签" value={selectedInfo.tagName} />
+            <CopyField label="ID" value={selectedInfo.id} />
+            <CopyField label="类名" value={selectedInfo.className} />
+            <CopyField label="尺寸" value={`${selectedInfo.rect.width} × ${selectedInfo.rect.height}`} />
+            <CopyField label="位置" value={`top=${selectedInfo.rect.top}, left=${selectedInfo.rect.left}`} />
+            {selectedInfo.editableType && (
+              <>
+                <CopyField label="可编辑" value={selectedInfo.editableType} />
+                <CopyField label="值" value={selectedInfo.editableValue || ""} />
+              </>
+            )}
+            <CopyField label="文本" value={selectedInfo.textContent} />
+            <CopyField label="outerHTML" value={selectedInfo.outerHTML} />
+          </div>
+        </ModalShell>
       )}
 
       <SaveModal

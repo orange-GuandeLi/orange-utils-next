@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Button, Chip, Tooltip, Select, ListBox } from "@heroui/react";
-import { GitCompareArrows, FolderOpen } from "lucide-react";
+import { GitCompareArrows, FolderOpen, X } from "lucide-react";
 import { DiffView } from "./DiffView";
 import { kvGet, kvKeys } from "../../utils/db";
 
@@ -130,7 +130,7 @@ export function CodeCompare() {
                 variant="ghost"
                 onPress={() => setLoadTarget(null)}
               >
-                ✕
+                <X size={14} />
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">

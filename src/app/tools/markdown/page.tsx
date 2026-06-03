@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { Button, Input, Tooltip, Modal, Label, TextField, Chip, toast } from "@heroui/react";
-import { Save, FolderOpen, Trash2, FileDown } from "lucide-react";
+import { Button, Input, Tooltip, Label, TextField, Chip, toast } from "@heroui/react";
+import { Save, FolderOpen, Trash2, FileDown, FileCode } from "lucide-react";
 import { LoadModal } from "@/components/LoadModal";
 import { SaveModal } from "@/components/SaveModal";
+import { ToolHeader } from "@/components/ToolHeader";
+import { ToolActionButtons } from "@/components/ToolActionButtons";
 import { kvGet, kvSet, kvDelete, kvKeys } from "@/utils/db";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { useSearchParams } from "next/navigation";
@@ -127,50 +129,20 @@ function NotesEditor() {
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
-      {/* Header */}
-      <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
-        <h1 className="text-sm font-semibold">Markdown</h1>
-        <span className="text-xs text-muted">
-          富文本编辑 → 保存资源 → 统一管理
-        </span>
-        <div className="flex-1" />
-        {currentName && (
-          <Chip size="sm" variant="soft" color="default">
-            <Chip.Label>{currentName}</Chip.Label>
-          </Chip>
-        )}
-        {dirty && (
-          <Chip size="sm" variant="soft" color="warning">
-            <Chip.Label>未保存</Chip.Label>
-          </Chip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
-              <Save size={14} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{currentName ? `覆盖保存「${currentName}」` : "保存"}</Tooltip.Content>
-        </Tooltip>
-        {currentName && (
-          <Tooltip delay={0}>
-            <Tooltip.Trigger className="flex flex-col">
-              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
-                <FileDown size={14} />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>另存为</Tooltip.Content>
-          </Tooltip>
-        )}
-        <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
-              <FolderOpen size={14} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>加载</Tooltip.Content>
-        </Tooltip>
-      </header>
+      <ToolHeader
+        icon={FileCode}
+        title="Markdown"
+        subtitle="富文本编辑 → 保存资源 → 统一管理"
+        extra={
+          <ToolActionButtons
+            currentName={currentName}
+            dirty={dirty}
+            onSave={handleSave}
+            onSaveAs={handleSaveAs}
+            onLoad={() => setLoadModalOpen(true)}
+          />
+        }
+      />
 
       {/* 编辑器 */}
       <div className="flex-1 overflow-hidden">
