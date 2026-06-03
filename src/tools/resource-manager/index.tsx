@@ -1,64 +1,43 @@
+"use client";
+
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Button, Chip, Tooltip, Modal, Tabs } from "@heroui/react";
+import { Button, Chip, Tooltip, Modal, Input, Label, TextField } from "@heroui/react";
 import {
   Database,
   Eye,
   Trash2,
   ExternalLink,
-  Code2,
-  Send,
   Clock,
   Download,
   Upload,
+  Plus,
 } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { CodeEditor } from "../../components/CodeEditor";
 
-// ---- 数据类型 ----
-type HtmlSavedItem = { name: string; html: string; savedAt: number };
-type ApiSavedItem = {
+type ResourceItem = {
+  _key: string;
   name: string;
-  method: string;
-  url: string;
-  headers: { key: string; value: string }[];
-  body: string;
+  content: string;
+  source: "tool" | "manual";
+  toolName?: string;
   savedAt: number;
+  method?: string;
+  url?: string;
 };
-
-type ToolGroup = {
-  id: string;
-  name: string;
-  icon: typeof Code2;
-  prefix: string;
-  color: "accent" | "success" | "warning" | "danger";
-};
-
-const TOOL_GROUPS: ToolGroup[] = [
-  {
-    id: "html-selector",
-    name: "HTML 选择器",
-    icon: Code2,
-    prefix: "html-selector:saved:",
-    color: "accent",
-  },
-  {
-    id: "api-request",
-    name: "API 请求",
-    icon: Send,
-    prefix: "api-request:saved:",
-    color: "success",
-  },
-];
 
 export function ResourceManager() {
-  const [activeTab, setActiveTab] = useState(TOOL_GROUPS[0].id);
-  const [allItems, setAllItems] = useState<Record<string, unknown[]>>({});
-  const [detailItem, setDetailItem] = useState<{
-    tool: string;
-    key: string;
-    data: unknown;
-  } | null>(null);
+  const [allItems, setAllItems] = useState<ResourceItem[]>([]);
+  const [showSource, setShowSource] = useState<"all" | "manual" | "tool">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [detailItem, setDetailItem] = useState<ResourceItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newContent, setNewContent] = useState("");
+
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<{
     count: number;
@@ -67,92 +46,84 @@ export function ResourceManager() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 加载所有保存的资源
+  // 加载所有资源
   const loadAll = useCallback(async () => {
     const keys = await kvKeys();
-    const grouped: Record<string, unknown[]> = {};
-    for (const group of TOOL_GROUPS) {
-      grouped[group.id] = [];
-    }
+    const items: ResourceItem[] = [];
+
     for (const key of keys) {
-      for (const group of TOOL_GROUPS) {
-        if (key.startsWith(group.prefix)) {
-          const item = await kvGet(key);
-          if (item)
-            grouped[group.id].push({ _key: key, ...((item as object) || {}) });
-        }
-      }
+      if (!key.includes(":saved:")) continue;
+      const item = await kvGet<Record<string, unknown>>(key);
+      if (!item) continue;
+
+      const isManual = key.startsWith("manual:");
+      const isHtml = key.startsWith("html-selector:");
+      const isApi = key.startsWith("api-request:");
+
+      items.push({
+        _key: key,
+        name: (item.name as string) || key.replace(/^.*?:saved:/, ""),
+        content: isHtml
+          ? ((item as { html?: string }).html || "")
+          : JSON.stringify(item, null, 2),
+        source: isManual ? "manual" : "tool",
+        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : undefined,
+        savedAt: (item.savedAt as number) || 0,
+        method: isApi ? (item.method as string) : undefined,
+        url: isApi ? (item.url as string) : undefined,
+      });
     }
-    // 按 savedAt 降序
-    for (const group of TOOL_GROUPS) {
-      grouped[group.id].sort(
-        (a, b) =>
-          ((b as { savedAt?: number }).savedAt || 0) -
-          ((a as { savedAt?: number }).savedAt || 0),
-      );
-    }
-    setAllItems(grouped);
+
+    items.sort((a, b) => b.savedAt - a.savedAt);
+    setAllItems(items);
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // 筛选
+  const filteredItems = allItems.filter((item) => {
+    if (showSource !== "all" && item.source !== showSource) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!item.name.toLowerCase().includes(q) && !item.content.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
   const handleDelete = async (key: string) => {
     await kvDelete(key);
     loadAll();
-    if (detailItem?.key === key) {
+    if (detailItem?._key === key) {
       setDetailOpen(false);
       setDetailItem(null);
     }
   };
 
-  const handleViewDetail = (tool: string, key: string, data: unknown) => {
-    setDetailItem({ tool, key, data });
-    setDetailOpen(true);
+  // 新建资源
+  const handleCreate = async () => {
+    if (!newName.trim() || !newContent.trim()) return;
+    await kvSet(`manual:saved:${newName}`, {
+      name: newName,
+      content: newContent,
+      savedAt: Date.now(),
+    });
+    setCreateModalOpen(false);
+    setNewName("");
+    setNewContent("");
+    loadAll();
   };
 
-  const getDetailContent = (): string => {
-    if (!detailItem) return "";
-    const d = detailItem.data as Record<string, unknown>;
-    if (detailItem.tool === "html-selector") {
-      return (d as HtmlSavedItem).html || "";
-    }
-    if (detailItem.tool === "api-request") {
-      const api = d as ApiSavedItem;
-      return JSON.stringify(
-        {
-          method: api.method,
-          url: api.url,
-          headers: api.headers,
-          body: api.body,
-        },
-        null,
-        2,
-      );
-    }
-    return JSON.stringify(d, null, 2);
-  };
-
-  const getDetailLanguage = (): "html" | "json" => {
-    if (detailItem?.tool === "html-selector") return "html";
-    return "json";
-  };
-
-  // ---- 导出 ----
+  // 导出
   const handleExport = async () => {
     const keys = await kvKeys();
     const data: Record<string, unknown> = {};
     for (const key of keys) {
-      // 只导出工具保存的数据（带 :saved: 前缀的）
-      if (TOOL_GROUPS.some((g) => key.startsWith(g.prefix))) {
+      if (key.includes(":saved:")) {
         const value = await kvGet(key);
         if (value !== undefined) data[key] = value;
       }
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -161,71 +132,47 @@ export function ResourceManager() {
     URL.revokeObjectURL(url);
   };
 
-  // ---- 导入 ----
+  // 导入
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const raw = JSON.parse(reader.result as string) as Record<
-          string,
-          unknown
-        >;
-        // 只保留合法的工具数据 key
-        const validKeys = Object.keys(raw).filter((k) =>
-          TOOL_GROUPS.some((g) => k.startsWith(g.prefix)),
-        );
-        setImportPreview({
-          count: validKeys.length,
-          keys: validKeys,
-          raw,
-        });
+        const raw = JSON.parse(reader.result as string) as Record<string, unknown>;
+        const validKeys = Object.keys(raw).filter((k) => k.includes(":saved:"));
+        setImportPreview({ count: validKeys.length, keys: validKeys, raw });
         setImportModalOpen(true);
       } catch {
-        alert("文件格式错误，请选择有效的 JSON 文件");
+        alert("文件格式错误");
       }
     };
     reader.readAsText(file);
-    // 清空 input 以便重复选择同一文件
     e.target.value = "";
   };
 
   const handleImportConfirm = async (mode: "merge" | "overwrite") => {
     if (!importPreview) return;
-    const { raw } = importPreview;
-
     if (mode === "overwrite") {
-      // 先删除现有数据
       const keys = await kvKeys();
       for (const key of keys) {
-        if (TOOL_GROUPS.some((g) => key.startsWith(g.prefix))) {
-          await kvDelete(key);
-        }
+        if (key.includes(":saved:")) await kvDelete(key);
       }
     }
-
-    // 写入导入数据
-    for (const [key, value] of Object.entries(raw)) {
-      if (TOOL_GROUPS.some((g) => key.startsWith(g.prefix))) {
+    for (const [key, value] of Object.entries(importPreview.raw)) {
+      if (key.includes(":saved:")) {
         if (mode === "merge") {
-          // 合并模式：只写入不存在的 key
           const existing = await kvGet(key);
-          if (existing === undefined) {
-            await kvSet(key, value);
-          }
+          if (existing === undefined) await kvSet(key, value);
         } else {
           await kvSet(key, value);
         }
       }
     }
-
     setImportModalOpen(false);
     setImportPreview(null);
     loadAll();
   };
-
-  const currentItems = allItems[activeTab] || [];
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
@@ -233,187 +180,106 @@ export function ResourceManager() {
       <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
         <Database size={16} className="text-accent" />
         <h1 className="text-sm font-semibold">资源管理</h1>
-        <span className="text-xs text-muted">统一管理所有工具保存的数据</span>
         <div className="flex-1" />
         <Chip size="sm" variant="soft" color="default">
-          <Chip.Label>
-            共 {Object.values(allItems).flat().length} 条资源
-          </Chip.Label>
+          <Chip.Label>{filteredItems.length} 条</Chip.Label>
         </Chip>
-        <Tooltip delay={0}>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={handleExport}
-          >
-            <Download size={14} />
-            <span className="text-xs">导出</span>
-          </Button>
-          <Tooltip.Content>导出所有资源为 JSON 文件</Tooltip.Content>
-        </Tooltip>
-        <Tooltip delay={0}>
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={() => fileInputRef.current?.click()}
-          >
-            <Upload size={14} />
-            <span className="text-xs">导入</span>
-          </Button>
-          <Tooltip.Content>从 JSON 文件导入资源</Tooltip.Content>
-        </Tooltip>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
+          <Plus size={14} /><span className="text-xs">新建</span>
+        </Button>
+        <Button size="sm" variant="ghost" onPress={handleExport}>
+          <Download size={14} /><span className="text-xs">导出</span>
+        </Button>
+        <Button size="sm" variant="ghost" onPress={() => fileInputRef.current?.click()}>
+          <Upload size={14} /><span className="text-xs">导入</span>
+        </Button>
+        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileSelect} />
       </header>
 
-      {/* Main */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <Tabs
-          className="flex-1 min-h-0 flex flex-col mt-2"
-          defaultSelectedKey={activeTab}
-          onSelectionChange={(key) => {
-            if (key) setActiveTab(key as string);
-          }}
-        >
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="工具分组">
-              {TOOL_GROUPS.map((group) => {
-                const Icon = group.icon;
-                const count = (allItems[group.id] || []).length;
-                return (
-                  <Tabs.Tab key={group.id} id={group.id} className="text-xs">
-                    <Icon size={14} className="mr-1.5" />
-                    {group.name}
-                    {count > 0 && (
-                      <Chip
-                        size="sm"
-                        variant="soft"
-                        color={group.color}
-                        className="ml-1.5"
-                      >
-                        <Chip.Label>{count}</Chip.Label>
+      {/* 筛选栏 */}
+      <div className="h-10 border-b border-separator flex items-center px-4 gap-2 shrink-0 bg-surface">
+        <div className="flex gap-1 p-0.5 bg-surface-secondary rounded-lg">
+          {(["all", "manual", "tool"] as const).map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={showSource === s ? "primary" : "ghost"}
+              className="text-xs px-3"
+              onPress={() => setShowSource(s)}
+            >
+              {s === "all" ? "全部" : s === "manual" ? "手动创建" : "工具保存"}
+            </Button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <Input
+          className="w-48"
+          placeholder="搜索..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+        />
+      </div>
+
+      {/* 列表 */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-muted gap-3">
+            <Database size={32} className="opacity-30" />
+            <p className="text-sm">{allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}</p>
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {filteredItems.map((item) => (
+              <div
+                key={item._key}
+                className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-separator hover:border-accent/30 transition-colors group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" variant="soft" color={item.source === "manual" ? "success" : "accent"}>
+                      <Chip.Label className="text-xs">{item.source === "manual" ? "手动" : item.toolName || "工具"}</Chip.Label>
+                    </Chip>
+                    {item.method && (
+                      <Chip size="sm" variant="soft" color="accent">
+                        <Chip.Label className="font-mono text-xs">{item.method}</Chip.Label>
                       </Chip>
                     )}
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                );
-              })}
-            </Tabs.List>
-          </Tabs.ListContainer>
-
-          {TOOL_GROUPS.map((group) => (
-            <Tabs.Panel
-              key={group.id}
-              id={group.id}
-              className="flex-1 overflow-y-auto mt-0 p-4"
-            >
-              {currentItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-muted gap-3">
-                  <group.icon size={32} className="opacity-30" />
-                  <p className="text-sm">{group.name} 暂无保存的资源</p>
+                    <span className="text-sm font-medium truncate">{item.name}</span>
+                  </div>
+                  {item.url && <p className="text-xs text-muted truncate mt-0.5 font-mono">{item.url}</p>}
+                  <div className="text-xs text-muted mt-1 flex items-center gap-1">
+                    <Clock size={10} />{item.savedAt ? new Date(item.savedAt).toLocaleString() : ""}
+                  </div>
                 </div>
-              ) : (
-                <div className="grid gap-3">
-                  {(
-                    currentItems as (Record<string, unknown> & {
-                      _key: string;
-                    })[]
-                  ).map((item) => {
-                    const savedAt = item.savedAt as number | undefined;
-                    const name = (item.name as string) || item._key;
-                    const isApi = group.id === "api-request";
-                    const method = isApi ? (item.method as string) : null;
-                    const url = isApi ? (item.url as string) : null;
-
-                    return (
-                      <div
-                        key={item._key}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-surface border border-separator hover:border-accent/30 transition-colors group"
-                      >
-                        {/* 左侧信息 */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {method && (
-                              <Chip size="sm" variant="soft" color="accent">
-                                <Chip.Label className="font-mono text-xs">
-                                  {method}
-                                </Chip.Label>
-                              </Chip>
-                            )}
-                            <span className="text-sm font-medium truncate">
-                              {name}
-                            </span>
-                          </div>
-                          {url && (
-                            <p className="text-xs text-muted truncate mt-1 font-mono">
-                              {url}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted">
-                            <Clock size={11} />
-                            {savedAt
-                              ? new Date(savedAt).toLocaleString()
-                              : "未知时间"}
-                          </div>
-                        </div>
-
-                        {/* 右侧操作 */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Tooltip delay={0}>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              onPress={() =>
-                                handleViewDetail(group.id, item._key, item)
-                              }
-                            >
-                              <Eye size={14} />
-                            </Button>
-                            <Tooltip.Content>查看详情</Tooltip.Content>
-                          </Tooltip>
-                          <Tooltip delay={0}>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              onPress={() => {
-                                window.dispatchEvent(
-                                  new CustomEvent("orange-utils:navigate", {
-                                    detail: group.id,
-                                  }),
-                                );
-                              }}
-                            >
-                              <ExternalLink size={14} />
-                            </Button>
-                            <Tooltip.Content>打开工具</Tooltip.Content>
-                          </Tooltip>
-                          <Tooltip delay={0}>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              onPress={() => handleDelete(item._key)}
-                            >
-                              <Trash2 size={14} className="text-danger" />
-                            </Button>
-                            <Tooltip.Content>删除</Tooltip.Content>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Tooltip delay={0}>
+                    <Button isIconOnly size="sm" variant="ghost" onPress={() => { setDetailItem(item); setDetailOpen(true); }}>
+                      <Eye size={14} />
+                    </Button>
+                    <Tooltip.Content>查看</Tooltip.Content>
+                  </Tooltip>
+                  {item.source === "tool" && (
+                    <Tooltip delay={0}>
+                      <Button isIconOnly size="sm" variant="ghost" onPress={() => {
+                        const toolId = item._key.startsWith("html-selector:") ? "html-selector" : "api-request";
+                        window.location.href = `/tools/${toolId}`;
+                      }}>
+                        <ExternalLink size={14} />
+                      </Button>
+                      <Tooltip.Content>打开工具</Tooltip.Content>
+                    </Tooltip>
+                  )}
+                  <Tooltip delay={0}>
+                    <Button isIconOnly size="sm" variant="ghost" onPress={() => handleDelete(item._key)}>
+                      <Trash2 size={14} className="text-danger" />
+                    </Button>
+                    <Tooltip.Content>删除</Tooltip.Content>
+                  </Tooltip>
                 </div>
-              )}
-            </Tabs.Panel>
-          ))}
-        </Tabs>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 详情 Modal */}
@@ -422,101 +288,75 @@ export function ResourceManager() {
           <Modal.Dialog className="sm:max-w-2xl">
             <Modal.CloseTrigger />
             <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent">
-                <Eye className="size-5" />
-              </Modal.Icon>
-              <Modal.Heading>
-                {detailItem
-                  ? ((detailItem.data as Record<string, unknown>)
-                      .name as string) || "资源详情"
-                  : "资源详情"}
-              </Modal.Heading>
+              <Modal.Heading>{detailItem?.name || "资源详情"}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <div className="h-80 min-h-0">
-                <CodeEditor
-                  value={getDetailContent()}
-                  language={getDetailLanguage()}
-                  readOnly
-                />
+                <CodeEditor value={detailItem?.content || ""} language="html" readOnly />
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                关闭
-              </Button>
+              <Button slot="close" variant="secondary">关闭</Button>
               {detailItem && (
-                <Button
-                  slot="close"
-                  variant="danger"
-                  onPress={() => handleDelete(detailItem.key)}
-                >
-                  删除
-                </Button>
+                <Button slot="close" variant="danger" onPress={() => handleDelete(detailItem._key)}>删除</Button>
               )}
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
 
-      {/* 导入确认 Modal */}
+      {/* 新建 Modal */}
+      <Modal.Backdrop isOpen={createModalOpen} onOpenChange={setCreateModalOpen}>
+        <Modal.Container>
+          <Modal.Dialog className="sm:max-w-2xl">
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>新建资源</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <div className="space-y-4">
+                <TextField value={newName} onChange={setNewName}>
+                  <Label>名称</Label>
+                  <Input placeholder="资源名称" />
+                </TextField>
+                <div>
+                  <Label className="text-xs text-muted mb-2 block">内容</Label>
+                  <div className="h-64 border border-separator rounded-lg overflow-hidden">
+                    <CodeEditor value={newContent} onChange={setNewContent} language="html" />
+                  </div>
+                </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">取消</Button>
+              <Button slot="close" onPress={handleCreate} isDisabled={!newName.trim() || !newContent.trim()}>创建</Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+
+      {/* 导入 Modal */}
       <Modal.Backdrop isOpen={importModalOpen} onOpenChange={setImportModalOpen}>
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-md">
             <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-success-soft text-success">
-                <Upload className="size-5" />
-              </Modal.Icon>
-              <Modal.Heading>导入资源</Modal.Heading>
-            </Modal.Header>
+            <Modal.Header><Modal.Heading>导入资源</Modal.Heading></Modal.Header>
             <Modal.Body>
               {importPreview && (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted">
-                    检测到{" "}
-                    <span className="text-foreground font-medium">
-                      {importPreview.count}
-                    </span>{" "}
-                    条资源数据：
-                  </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted">检测到 <span className="text-foreground font-medium">{importPreview.count}</span> 条资源</p>
                   <div className="max-h-40 overflow-y-auto rounded-lg bg-surface-secondary divide-y divide-separator">
                     {importPreview.keys.map((key) => (
-                      <div
-                        key={key}
-                        className="px-3 py-2 text-xs font-mono text-muted"
-                      >
-                        {key}
-                      </div>
+                      <div key={key} className="px-3 py-2 text-xs font-mono text-muted">{key}</div>
                     ))}
                   </div>
-                  <p className="text-xs text-muted">
-                    请选择导入模式：
-                  </p>
                 </div>
               )}
             </Modal.Body>
             <Modal.Footer>
-              <Button
-                slot="close"
-                variant="secondary"
-              >
-                取消
-              </Button>
-              <Button
-                slot="close"
-                variant="ghost"
-                onPress={() => handleImportConfirm("merge")}
-              >
-                合并导入
-              </Button>
-              <Button
-                slot="close"
-                variant="primary"
-                onPress={() => handleImportConfirm("overwrite")}
-              >
-                覆盖导入
-              </Button>
+              <Button slot="close" variant="secondary">取消</Button>
+              <Button slot="close" variant="ghost" onPress={() => handleImportConfirm("merge")}>合并</Button>
+              <Button slot="close" onPress={() => handleImportConfirm("overwrite")}>覆盖</Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
