@@ -59,6 +59,7 @@ export function ResourceManager() {
       const isManual = key.startsWith("manual:");
       const isHtml = key.startsWith("html-selector:");
       const isApi = key.startsWith("api-request:");
+      const isRegex = key.startsWith("regex:");
 
       items.push({
         _key: key,
@@ -67,7 +68,7 @@ export function ResourceManager() {
           ? ((item as { html?: string }).html || "")
           : JSON.stringify(item, null, 2),
         source: isManual ? "manual" : "tool",
-        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : undefined,
+        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : isRegex ? "正则测试" : undefined,
         savedAt: (item.savedAt as number) || 0,
         method: isApi ? (item.method as string) : undefined,
         url: isApi ? (item.url as string) : undefined,

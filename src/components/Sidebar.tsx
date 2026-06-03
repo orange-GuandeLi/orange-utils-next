@@ -10,6 +10,7 @@ import {
   Send,
   Database,
   GitCompareArrows,
+  Regex,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -35,6 +36,13 @@ const TOOLS = [
     description: "对比两份代码，高亮差异",
     icon: GitCompareArrows,
     href: "/tools/code-compare",
+  },
+  {
+    id: "regex-tester",
+    name: "正则测试",
+    description: "实时测试正则表达式",
+    icon: Regex,
+    href: "/tools/regex-tester",
   },
 ];
 
