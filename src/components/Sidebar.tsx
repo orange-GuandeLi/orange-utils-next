@@ -30,18 +30,21 @@ const TOOLS = [
     href: "/tools/api-request",
   },
   {
-    id: "resource-manager",
-    name: "资源管理",
-    description: "统一管理所有工具保存的数据",
-    icon: Database,
-    href: "/tools/resource-manager",
-  },
-  {
     id: "code-compare",
     name: "代码对比",
     description: "对比两份代码，高亮差异",
     icon: GitCompareArrows,
     href: "/tools/code-compare",
+  },
+];
+
+const SYSTEM = [
+  {
+    id: "resource-manager",
+    name: "资源管理",
+    description: "统一管理所有工具保存的数据",
+    icon: Database,
+    href: "/tools/resource-manager",
   },
 ];
 
@@ -109,6 +112,34 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* 底部系统功能 */}
+      <div className="p-2 border-t border-separator space-y-1">
+        {SYSTEM.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+          return (
+            <Tooltip key={item.id} delay={0}>
+              <Link
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "hover:bg-surface-secondary text-muted"
+                } ${collapsed ? "justify-center" : ""}`}
+              >
+                <Icon size={16} className={isActive ? "text-accent" : ""} />
+                {!collapsed && (
+                  <span className="truncate text-xs">{item.name}</span>
+                )}
+              </Link>
+              <Tooltip.Content placement="right">
+                {collapsed ? item.name : item.description}
+              </Tooltip.Content>
+            </Tooltip>
+          );
+        })}
+      </div>
     </aside>
   );
 }
