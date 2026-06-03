@@ -197,35 +197,49 @@ export function ResourceManager() {
       </header>
 
       {/* 筛选栏 */}
-      <div className="h-10 border-b border-separator flex items-center px-4 gap-2 shrink-0 bg-surface">
-        <div className="flex gap-1 p-0.5 bg-surface-secondary rounded-lg">
-          {(["all", "manual", "tool"] as const).map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={showSource === s ? "primary" : "ghost"}
-              className="text-xs px-3"
-              onPress={() => setShowSource(s)}
-            >
-              {s === "all" ? "全部" : s === "manual" ? "手动创建" : "工具保存"}
-            </Button>
-          ))}
+      <div className="px-4 py-3 bg-surface border-b border-separator">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 p-1 bg-background rounded-lg border border-separator">
+            {(["all", "manual", "tool"] as const).map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={showSource === s ? "primary" : "ghost"}
+                className="text-xs px-4"
+                onPress={() => setShowSource(s)}
+              >
+                {s === "all" ? "全部" : s === "manual" ? "手动创建" : "工具保存"}
+              </Button>
+            ))}
+          </div>
+          <div className="flex-1" />
+          <Input
+            className="w-56"
+            placeholder="搜索资源..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+          />
         </div>
-        <div className="flex-1" />
-        <Input
-          className="w-48"
-          placeholder="搜索..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-        />
       </div>
 
       {/* 列表 */}
       <div className="flex-1 overflow-y-auto p-4">
         {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted gap-3">
-            <Database size={32} className="opacity-30" />
-            <p className="text-sm">{allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}</p>
+          <div className="flex flex-col items-center justify-center h-64 text-muted gap-4">
+            <Database size={40} className="opacity-20" />
+            <div className="text-center">
+              <p className="text-sm font-medium">{allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}</p>
+              <p className="text-xs mt-1">
+                {allItems.length === 0
+                  ? "点击上方「新建」按钮创建第一个资源"
+                  : "尝试切换筛选条件或修改搜索关键词"}
+              </p>
+            </div>
+            {allItems.length === 0 && (
+              <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
+                <Plus size={14} /><span className="text-xs">新建资源</span>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid gap-2">
