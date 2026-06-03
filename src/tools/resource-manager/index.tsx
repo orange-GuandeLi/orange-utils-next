@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Button, Chip, Tooltip, Modal, Input, Label, TextField } from "@heroui/react";
+import {
+  Button,
+  Chip,
+  Tooltip,
+  Modal,
+  Input,
+  Label,
+  TextField,
+  Alert,
+} from "@heroui/react";
 import {
   Database,
   Eye,
@@ -28,7 +37,9 @@ type ResourceItem = {
 
 export function ResourceManager() {
   const [allItems, setAllItems] = useState<ResourceItem[]>([]);
-  const [showSource, setShowSource] = useState<"all" | "manual" | "tool">("all");
+  const [showSource, setShowSource] = useState<"all" | "manual" | "tool">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   const [detailItem, setDetailItem] = useState<ResourceItem | null>(null);
@@ -66,12 +77,20 @@ export function ResourceManager() {
         _key: key,
         name: (item.name as string) || key.replace(/^.*?:saved:/, ""),
         content: isHtml
-          ? ((item as { html?: string }).html || "")
+          ? (item as { html?: string }).html || ""
           : isNotes
-            ? ((item as { content?: string }).content || "")
+            ? (item as { content?: string }).content || ""
             : JSON.stringify(item, null, 2),
         source: isManual ? "manual" : "tool",
-        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : isRegex ? "正则测试" : isNotes ? "Markdown" : undefined,
+        toolName: isHtml
+          ? "HTML 选择器"
+          : isApi
+            ? "API 请求"
+            : isRegex
+              ? "正则测试"
+              : isNotes
+                ? "Markdown"
+                : undefined,
         savedAt: (item.savedAt as number) || 0,
         method: isApi ? (item.method as string) : undefined,
         url: isApi ? (item.url as string) : undefined,
@@ -92,7 +111,11 @@ export function ResourceManager() {
     if (showSource !== "all" && item.source !== showSource) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      if (!item.name.toLowerCase().includes(q) && !item.content.toLowerCase().includes(q)) return false;
+      if (
+        !item.name.toLowerCase().includes(q) &&
+        !item.content.toLowerCase().includes(q)
+      )
+        return false;
     }
     return true;
   });
@@ -130,7 +153,9 @@ export function ResourceManager() {
         if (value !== undefined) data[key] = value;
       }
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -146,7 +171,10 @@ export function ResourceManager() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const raw = JSON.parse(reader.result as string) as Record<string, unknown>;
+        const raw = JSON.parse(reader.result as string) as Record<
+          string,
+          unknown
+        >;
         const validKeys = Object.keys(raw).filter((k) => k.includes(":saved:"));
         setImportPreview({ count: validKeys.length, keys: validKeys, raw });
         setImportModalOpen(true);
@@ -191,16 +219,33 @@ export function ResourceManager() {
         <Chip size="sm" variant="soft" color="default">
           <Chip.Label>{filteredItems.length} 条</Chip.Label>
         </Chip>
-        <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
-          <Plus size={14} /><span className="text-xs">新建</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => setCreateModalOpen(true)}
+        >
+          <Plus size={14} />
+          <span className="text-xs">新建</span>
         </Button>
         <Button size="sm" variant="ghost" onPress={handleExport}>
-          <Download size={14} /><span className="text-xs">导出</span>
+          <Download size={14} />
+          <span className="text-xs">导出</span>
         </Button>
-        <Button size="sm" variant="ghost" onPress={() => fileInputRef.current?.click()}>
-          <Upload size={14} /><span className="text-xs">导入</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => fileInputRef.current?.click()}
+        >
+          <Upload size={14} />
+          <span className="text-xs">导入</span>
         </Button>
-        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileSelect} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
       </header>
 
       {/* 筛选栏 */}
@@ -215,7 +260,11 @@ export function ResourceManager() {
                 className="text-xs px-4"
                 onPress={() => setShowSource(s)}
               >
-                {s === "all" ? "全部" : s === "manual" ? "手动创建" : "工具保存"}
+                {s === "all"
+                  ? "全部"
+                  : s === "manual"
+                    ? "手动创建"
+                    : "工具保存"}
               </Button>
             ))}
           </div>
@@ -224,9 +273,24 @@ export function ResourceManager() {
             className="w-56"
             placeholder="搜索资源..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+            onChange={(e) =>
+              setSearchQuery((e.target as HTMLInputElement).value)
+            }
           />
         </div>
+      </div>
+
+      {/* 提示 */}
+      <div className="px-4 pt-3">
+        <Alert>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>数据存储说明</Alert.Title>
+            <Alert.Description>
+              所有数据存储在浏览器本地，不支持跨设备同步。如需迁移数据，请使用上方的"导出"和"导入"功能。
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       </div>
 
       {/* 列表 */}
@@ -235,7 +299,9 @@ export function ResourceManager() {
           <div className="flex flex-col items-center justify-center h-64 text-muted gap-4">
             <Database size={40} className="opacity-20" />
             <div className="text-center">
-              <p className="text-sm font-medium">{allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}</p>
+              <p className="text-sm font-medium">
+                {allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}
+              </p>
               <p className="text-xs mt-1">
                 {allItems.length === 0
                   ? "点击上方「新建」按钮创建第一个资源"
@@ -243,8 +309,13 @@ export function ResourceManager() {
               </p>
             </div>
             {allItems.length === 0 && (
-              <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
-                <Plus size={14} /><span className="text-xs">新建资源</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={() => setCreateModalOpen(true)}
+              >
+                <Plus size={14} />
+                <span className="text-xs">新建资源</span>
               </Button>
             )}
           </div>
@@ -257,45 +328,86 @@ export function ResourceManager() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Chip size="sm" variant="soft" color={item.source === "manual" ? "success" : "accent"}>
-                      <Chip.Label className="text-xs">{item.source === "manual" ? "手动" : item.toolName || "工具"}</Chip.Label>
+                    <Chip
+                      size="sm"
+                      variant="soft"
+                      color={item.source === "manual" ? "success" : "accent"}
+                    >
+                      <Chip.Label className="text-xs">
+                        {item.source === "manual"
+                          ? "手动"
+                          : item.toolName || "工具"}
+                      </Chip.Label>
                     </Chip>
                     {item.method && (
                       <Chip size="sm" variant="soft" color="accent">
-                        <Chip.Label className="font-mono text-xs">{item.method}</Chip.Label>
+                        <Chip.Label className="font-mono text-xs">
+                          {item.method}
+                        </Chip.Label>
                       </Chip>
                     )}
-                    <span className="text-sm font-medium truncate">{item.name}</span>
+                    <span className="text-sm font-medium truncate">
+                      {item.name}
+                    </span>
                   </div>
-                  {item.url && <p className="text-xs text-muted truncate mt-0.5 font-mono">{item.url}</p>}
+                  {item.url && (
+                    <p className="text-xs text-muted truncate mt-0.5 font-mono">
+                      {item.url}
+                    </p>
+                  )}
                   <div className="text-xs text-muted mt-1 flex items-center gap-1">
-                    <Clock size={10} />{item.savedAt ? new Date(item.savedAt).toLocaleString() : ""}
+                    <Clock size={10} />
+                    {item.savedAt
+                      ? new Date(item.savedAt).toLocaleString()
+                      : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Tooltip delay={0}>
-                    <Button isIconOnly size="sm" variant="ghost" onPress={() => { setDetailItem(item); setDetailOpen(true); }}>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => {
+                        setDetailItem(item);
+                        setDetailOpen(true);
+                      }}
+                    >
                       <Eye size={14} />
                     </Button>
                     <Tooltip.Content>查看</Tooltip.Content>
                   </Tooltip>
                   {item.source === "tool" && (
                     <Tooltip delay={0}>
-                      <Button isIconOnly size="sm" variant="ghost" onPress={() => {
-                        let toolId = "api-request";
-                        if (item._key.startsWith("html-selector:")) toolId = "html-selector";
-                        else if (item._key.startsWith("api-request:")) toolId = "api-request";
-                        else if (item._key.startsWith("regex:")) toolId = "regex-tester";
-                        else if (item._key.startsWith("notes:")) toolId = "markdown";
-                        window.location.href = `/tools/${toolId}`;
-                      }}>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => {
+                          let toolId = "api-request";
+                          if (item._key.startsWith("html-selector:"))
+                            toolId = "html-selector";
+                          else if (item._key.startsWith("api-request:"))
+                            toolId = "api-request";
+                          else if (item._key.startsWith("regex:"))
+                            toolId = "regex-tester";
+                          else if (item._key.startsWith("notes:"))
+                            toolId = "markdown";
+                          window.location.href = `/tools/${toolId}`;
+                        }}
+                      >
                         <ExternalLink size={14} />
                       </Button>
                       <Tooltip.Content>打开工具</Tooltip.Content>
                     </Tooltip>
                   )}
                   <Tooltip delay={0}>
-                    <Button isIconOnly size="sm" variant="ghost" onPress={() => handleDelete(item._key)}>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => handleDelete(item._key)}
+                    >
                       <Trash2 size={14} className="text-danger" />
                     </Button>
                     <Tooltip.Content>删除</Tooltip.Content>
@@ -317,13 +429,25 @@ export function ResourceManager() {
             </Modal.Header>
             <Modal.Body>
               <div className="h-80 min-h-0">
-                <CodeEditor value={detailItem?.content || ""} language="html" readOnly />
+                <CodeEditor
+                  value={detailItem?.content || ""}
+                  language="html"
+                  readOnly
+                />
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button slot="close" variant="secondary">关闭</Button>
+              <Button slot="close" variant="secondary">
+                关闭
+              </Button>
               {detailItem && (
-                <Button slot="close" variant="danger" onPress={() => handleDelete(detailItem._key)}>删除</Button>
+                <Button
+                  slot="close"
+                  variant="danger"
+                  onPress={() => handleDelete(detailItem._key)}
+                >
+                  删除
+                </Button>
               )}
             </Modal.Footer>
           </Modal.Dialog>
@@ -331,7 +455,10 @@ export function ResourceManager() {
       </Modal.Backdrop>
 
       {/* 新建 Modal */}
-      <Modal.Backdrop isOpen={createModalOpen} onOpenChange={setCreateModalOpen}>
+      <Modal.Backdrop
+        isOpen={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+      >
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-2xl">
             <Modal.CloseTrigger />
@@ -347,41 +474,82 @@ export function ResourceManager() {
                 <div>
                   <Label className="text-xs text-muted mb-2 block">内容</Label>
                   <div className="h-64 border border-separator rounded-lg overflow-hidden">
-                    <CodeEditor value={newContent} onChange={setNewContent} language="html" />
+                    <CodeEditor
+                      value={newContent}
+                      onChange={setNewContent}
+                      language="html"
+                    />
                   </div>
                 </div>
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleCreate} isDisabled={!newName.trim() || !newContent.trim()}>创建</Button>
+              <Button slot="close" variant="secondary">
+                取消
+              </Button>
+              <Button
+                slot="close"
+                onPress={handleCreate}
+                isDisabled={!newName.trim() || !newContent.trim()}
+              >
+                创建
+              </Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
 
       {/* 导入 Modal */}
-      <Modal.Backdrop isOpen={importModalOpen} onOpenChange={setImportModalOpen}>
+      <Modal.Backdrop
+        isOpen={importModalOpen}
+        onOpenChange={setImportModalOpen}
+      >
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-md">
             <Modal.CloseTrigger />
-            <Modal.Header><Modal.Heading>导入资源</Modal.Heading></Modal.Header>
+            <Modal.Header>
+              <Modal.Heading>导入资源</Modal.Heading>
+            </Modal.Header>
             <Modal.Body>
               {importPreview && (
                 <div className="space-y-3">
-                  <p className="text-sm text-muted">检测到 <span className="text-foreground font-medium">{importPreview.count}</span> 条资源</p>
+                  <p className="text-sm text-muted">
+                    检测到{" "}
+                    <span className="text-foreground font-medium">
+                      {importPreview.count}
+                    </span>{" "}
+                    条资源
+                  </p>
                   <div className="max-h-40 overflow-y-auto rounded-lg bg-surface-secondary divide-y divide-separator">
                     {importPreview.keys.map((key) => (
-                      <div key={key} className="px-3 py-2 text-xs font-mono text-muted">{key}</div>
+                      <div
+                        key={key}
+                        className="px-3 py-2 text-xs font-mono text-muted"
+                      >
+                        {key}
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
             </Modal.Body>
             <Modal.Footer>
-              <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" variant="ghost" onPress={() => handleImportConfirm("merge")}>合并</Button>
-              <Button slot="close" onPress={() => handleImportConfirm("overwrite")}>覆盖</Button>
+              <Button slot="close" variant="secondary">
+                取消
+              </Button>
+              <Button
+                slot="close"
+                variant="ghost"
+                onPress={() => handleImportConfirm("merge")}
+              >
+                合并
+              </Button>
+              <Button
+                slot="close"
+                onPress={() => handleImportConfirm("overwrite")}
+              >
+                覆盖
+              </Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
