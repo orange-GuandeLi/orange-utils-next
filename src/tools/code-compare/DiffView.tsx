@@ -59,7 +59,10 @@ export function DiffView({
     const langExt =
       language === "html" ? html() : language === "json" ? json() : [];
 
-    const makeExtensions = (onChangeRef: React.MutableRefObject<((value: string) => void) | undefined>) => [
+    const makeExtensions = (
+      onChangeRef: React.MutableRefObject<((value: string) => void) | undefined>,
+      lastRef: React.MutableRefObject<string>,
+    ) => [
       lineNumbers(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
@@ -72,7 +75,9 @@ export function DiffView({
       keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
-          onChangeRef.current?.(update.state.doc.toString());
+          const newVal = update.state.doc.toString();
+          lastRef.current = newVal;
+          onChangeRef.current?.(newVal);
         }
       }),
     ];
@@ -80,11 +85,11 @@ export function DiffView({
     const mergeView = new MergeView({
       a: {
         doc: leftValue,
-        extensions: makeExtensions(onLeftChangeRef),
+        extensions: makeExtensions(onLeftChangeRef, lastLeftRef),
       },
       b: {
         doc: rightValue,
-        extensions: makeExtensions(onRightChangeRef),
+        extensions: makeExtensions(onRightChangeRef, lastRightRef),
       },
       parent: containerRef.current,
       highlightChanges: true,
@@ -117,24 +122,31 @@ export function DiffView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
-  // 同步左侧内容
+  const lastLeftRef = useRef(leftValue);
+  const lastRightRef = useRef(rightValue);
+
+  // 同步左侧内容（跳过内部 onChange 引起的变化）
   useEffect(() => {
     const mv = mergeViewRef.current;
     if (!mv) return;
+    if (lastLeftRef.current === leftValue) return;
     const current = mv.a.state.doc.toString();
     if (current !== leftValue) {
+      lastLeftRef.current = leftValue;
       mv.a.dispatch({
         changes: { from: 0, to: current.length, insert: leftValue },
       });
     }
   }, [leftValue]);
 
-  // 同步右侧内容
+  // 同步右侧内容（跳过内部 onChange 引起的变化）
   useEffect(() => {
     const mv = mergeViewRef.current;
     if (!mv) return;
+    if (lastRightRef.current === rightValue) return;
     const current = mv.b.state.doc.toString();
     if (current !== rightValue) {
+      lastRightRef.current = rightValue;
       mv.b.dispatch({
         changes: { from: 0, to: current.length, insert: rightValue },
       });

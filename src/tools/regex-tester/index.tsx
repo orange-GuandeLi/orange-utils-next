@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button, Chip, Tooltip, Input, Modal, Label, TextField } from "@heroui/react";
 import { Regex, Copy, Check, Save, FolderOpen, Trash2 } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
@@ -79,39 +79,61 @@ export function RegexTester() {
   };
 
   // 计算匹配结果
-  const { matches, error } = useMemo(() => {
-    if (!pattern || !testString) return { matches: [], error: null };
-    try {
-      const regex = new RegExp(pattern, Array.from(flags).join(""));
-      const results: MatchResult[] = [];
-      let match: RegExpExecArray | null;
+  // 正则匹配结果（Web Worker 防止灾难性回溯卡死主线程）
+  const [matches, setMatches] = useState<MatchResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-      if (flags.has("g")) {
-        while ((match = regex.exec(testString)) !== null) {
-          results.push({
-            text: match[0],
-            index: match.index,
-            length: match[0].length,
-            groups: match.groups ? { ...match.groups } : undefined,
-          });
-          if (match[0].length === 0) regex.lastIndex++;
-        }
-      } else {
-        match = regex.exec(testString);
-        if (match) {
-          results.push({
-            text: match[0],
-            index: match.index,
-            length: match[0].length,
-            groups: match.groups ? { ...match.groups } : undefined,
-          });
-        }
-      }
-
-      return { matches: results, error: null };
-    } catch (e) {
-      return { matches: [], error: (e as Error).message };
+  useEffect(() => {
+    if (!pattern || !testString) {
+      setMatches([]);
+      setError(null);
+      return;
     }
+
+    // 终止上一次 worker
+    if (workerRef.current) { workerRef.current.terminate(); workerRef.current = null; }
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+
+    const worker = new Worker(
+      new URL("./regex.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
+      const { matches: m, error: err } = e.data as { matches: MatchResult[]; error: string | null };
+      setMatches(m);
+      setError(err);
+      worker.terminate();
+      workerRef.current = null;
+    };
+
+    worker.onerror = () => {
+      setMatches([]);
+      setError("Worker 执行出错");
+      worker.terminate();
+      workerRef.current = null;
+    };
+
+    worker.postMessage({ pattern, flags: Array.from(flags).join(""), testString });
+
+    // 500ms 超时保护（Worker 内部 200ms 已有，这里是兜底）
+    timerRef.current = setTimeout(() => {
+      if (workerRef.current === worker) {
+        worker.terminate();
+        workerRef.current = null;
+        setMatches([]);
+        setError("正则执行超时（500ms），可能存在灾难性回溯");
+      }
+    }, 500);
+
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    };
   }, [pattern, flags, testString]);
 
   // 高亮匹配文本

@@ -33,6 +33,9 @@ export function CodeEditor({ value, onChange, language = "html", readOnly = fals
   // eslint-disable-next-line react-hooks/refs
   onChangeRef.current = onChange;
 
+  // 记录最后一次 dispatch 的值，防止 dispatch→onChange→setState→dispatch 循环
+  const lastDispatchedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -53,7 +56,9 @@ export function CodeEditor({ value, onChange, language = "html", readOnly = fals
       extensions.push(
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChangeRef.current?.(update.state.doc.toString());
+            const newVal = update.state.doc.toString();
+            lastDispatchedRef.current = newVal;
+            onChangeRef.current?.(newVal);
           }
         }),
       );
@@ -66,16 +71,22 @@ export function CodeEditor({ value, onChange, language = "html", readOnly = fals
 
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    lastDispatchedRef.current = value;
 
     return () => { view.destroy(); viewRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, readOnly]);
 
+  // 同步外部 value 变化到编辑器
+  // 跳过内部 onChange 触发的 setState（lastDispatchedRef 已同步）
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    // 如果这个值就是编辑器自己 dispatch 出去的，跳过
+    if (lastDispatchedRef.current === value) return;
     const current = view.state.doc.toString();
     if (current !== value) {
+      lastDispatchedRef.current = value;
       view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
     }
   }, [value]);

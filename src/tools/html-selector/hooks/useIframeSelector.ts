@@ -335,6 +335,8 @@ export function useIframeSelector({
       return;
     }
 
+    // 等 iframe 加载完成后再绑定事件
+    const setup = () => {
     const doc = iframe.contentDocument;
     if (!doc || !doc.body) return;
 
@@ -489,6 +491,24 @@ export function useIframeSelector({
       if (rafId) cancelAnimationFrame(rafId);
       trackedElRef.current = null;
       removeOverlay();
+    };
+    }; // end setup
+
+    // 首次 setup
+    let cleanup: (() => void) | undefined;
+    cleanup = setup();
+
+    // iframe srcDoc 变化后重新 setup（load 事件在新文档加载后触发）
+    const onLoad = () => {
+      if (selectMode) {
+        cleanup?.();
+        cleanup = setup();
+      }
+    };
+    iframe.addEventListener("load", onLoad);
+    return () => {
+      iframe.removeEventListener("load", onLoad);
+      cleanup?.();
     };
   }, [
     selectMode,

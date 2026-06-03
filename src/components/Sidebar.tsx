@@ -83,18 +83,20 @@ export function Sidebar() {
           </div>
         )}
         <Tooltip delay={0}>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            onPress={() => setCollapsed(!collapsed)}
-          >
-            {collapsed ? (
-              <PanelLeft size={16} />
-            ) : (
-              <PanelLeftClose size={16} />
-            )}
-          </Button>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              onPress={() => setCollapsed(!collapsed)}
+            >
+              {collapsed ? (
+                <PanelLeft size={16} />
+              ) : (
+                <PanelLeftClose size={16} />
+              )}
+            </Button>
+          </Tooltip.Trigger>
           <Tooltip.Content placement="right">
             {collapsed ? "展开侧边栏" : "收起侧边栏"}
           </Tooltip.Content>
@@ -108,19 +110,21 @@ export function Sidebar() {
           const isActive = pathname === tool.href;
           return (
             <Tooltip key={tool.id} delay={0}>
-              <Link
-                href={tool.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive
-                    ? "bg-secondary text-secondary-foreground"
-                    : "hover:bg-surface-secondary text-muted"
-                } ${collapsed ? "justify-center" : ""}`}
-              >
-                <Icon size={16} className={isActive ? "text-accent" : ""} />
-                {!collapsed && (
-                  <span className="truncate text-xs">{tool.name}</span>
-                )}
-              </Link>
+              <Tooltip.Trigger className="flex flex-col">
+                <Link
+                  href={tool.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isActive
+                      ? "bg-secondary text-secondary-foreground"
+                      : "hover:bg-surface-secondary text-muted"
+                  } ${collapsed ? "justify-center" : ""}`}
+                >
+                  <Icon size={16} className={isActive ? "text-accent" : ""} />
+                  {!collapsed && (
+                    <span className="truncate text-xs">{tool.name}</span>
+                  )}
+                </Link>
+              </Tooltip.Trigger>
               <Tooltip.Content placement="right">
                 {collapsed ? tool.name : tool.description}
               </Tooltip.Content>
@@ -136,19 +140,21 @@ export function Sidebar() {
           const isActive = pathname === item.href;
           return (
             <Tooltip key={item.id} delay={0}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive
-                    ? "bg-secondary text-secondary-foreground"
-                    : "hover:bg-surface-secondary text-muted"
-                } ${collapsed ? "justify-center" : ""}`}
-              >
-                <Icon size={16} className={isActive ? "text-accent" : ""} />
-                {!collapsed && (
-                  <span className="truncate text-xs">{item.name}</span>
-                )}
-              </Link>
+              <Tooltip.Trigger className="flex flex-col">
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isActive
+                      ? "bg-secondary text-secondary-foreground"
+                      : "hover:bg-surface-secondary text-muted"
+                  } ${collapsed ? "justify-center" : ""}`}
+                >
+                  <Icon size={16} className={isActive ? "text-accent" : ""} />
+                  {!collapsed && (
+                    <span className="truncate text-xs">{item.name}</span>
+                  )}
+                </Link>
+              </Tooltip.Trigger>
               <Tooltip.Content placement="right">
                 {collapsed ? item.name : item.description}
               </Tooltip.Content>
