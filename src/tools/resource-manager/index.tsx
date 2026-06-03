@@ -9,7 +9,6 @@ import {
   Input,
   Label,
   TextField,
-  Alert,
 } from "@heroui/react";
 import {
   Database,
@@ -20,26 +19,93 @@ import {
   Download,
   Upload,
   Plus,
+  Code2,
+  Send,
+  Regex,
+  FileCode,
+  PenTool,
+  FolderOpen,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { CodeEditor } from "../../components/CodeEditor";
 
+// ─── 工具分类注册表 ───
+
+type ToolCategory = {
+  id: string;
+  name: string;
+  prefix: string;
+  icon: LucideIcon;
+  href: string;
+  /** 从存储值中提取可读内容 */
+  extractContent: (value: Record<string, unknown>) => string;
+  /** 从存储值中提取额外显示字段 */
+  extractMeta?: (value: Record<string, unknown>) => { method?: string; url?: string };
+};
+
+const TOOL_CATEGORIES: ToolCategory[] = [
+  {
+    id: "html-selector",
+    name: "HTML 选择器",
+    prefix: "html-selector:saved:",
+    icon: Code2,
+    href: "/tools/html-selector",
+    extractContent: (v) => (v.html as string) || "",
+  },
+  {
+    id: "api-request",
+    name: "API 请求",
+    prefix: "api-request:saved:",
+    icon: Send,
+    href: "/tools/api-request",
+    extractContent: () => "", // API 请求不需要显示内容
+    extractMeta: (v) => ({ method: v.method as string, url: v.url as string }),
+  },
+  {
+    id: "regex-tester",
+    name: "正则测试",
+    prefix: "regex:saved:",
+    icon: Regex,
+    href: "/tools/regex-tester",
+    extractContent: (v) => (v.pattern as string) || "",
+  },
+  {
+    id: "notes",
+    name: "Markdown",
+    prefix: "notes:saved:",
+    icon: FileCode,
+    href: "/tools/markdown",
+    extractContent: (v) => (v.content as string) || "",
+  },
+];
+
+const MANUAL_CATEGORY: ToolCategory = {
+  id: "manual",
+  name: "手动创建",
+  prefix: "manual:saved:",
+  icon: PenTool,
+  href: "",
+  extractContent: (v) => (v.content as string) || JSON.stringify(v, null, 2),
+};
+
+// ─── 类型 ───
+
 type ResourceItem = {
   _key: string;
+  _categoryId: string;
   name: string;
   content: string;
-  source: "tool" | "manual";
-  toolName?: string;
   savedAt: number;
   method?: string;
   url?: string;
 };
 
+// ─── 组件 ───
+
 export function ResourceManager() {
   const [allItems, setAllItems] = useState<ResourceItem[]>([]);
-  const [showSource, setShowSource] = useState<"all" | "manual" | "tool">(
-    "all",
-  );
+  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [detailItem, setDetailItem] = useState<ResourceItem | null>(null);
@@ -57,6 +123,9 @@ export function ResourceManager() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 所有分类（含手动）
+  const allCategories = [...TOOL_CATEGORIES, MANUAL_CATEGORY];
+
   // 加载所有资源
   const loadAll = useCallback(async () => {
     const keys = await kvKeys();
@@ -64,36 +133,20 @@ export function ResourceManager() {
 
     for (const key of keys) {
       if (!key.includes(":saved:")) continue;
-      const item = await kvGet<Record<string, unknown>>(key);
-      if (!item) continue;
+      const value = await kvGet<Record<string, unknown>>(key);
+      if (!value) continue;
 
-      const isManual = key.startsWith("manual:");
-      const isHtml = key.startsWith("html-selector:");
-      const isApi = key.startsWith("api-request:");
-      const isRegex = key.startsWith("regex:");
-      const isNotes = key.startsWith("notes:");
+      // 匹配分类
+      const category = allCategories.find((c) => key.startsWith(c.prefix));
+      if (!category) continue;
 
       items.push({
         _key: key,
-        name: (item.name as string) || key.replace(/^.*?:saved:/, ""),
-        content: isHtml
-          ? (item as { html?: string }).html || ""
-          : isNotes
-            ? (item as { content?: string }).content || ""
-            : JSON.stringify(item, null, 2),
-        source: isManual ? "manual" : "tool",
-        toolName: isHtml
-          ? "HTML 选择器"
-          : isApi
-            ? "API 请求"
-            : isRegex
-              ? "正则测试"
-              : isNotes
-                ? "Markdown"
-                : undefined,
-        savedAt: (item.savedAt as number) || 0,
-        method: isApi ? (item.method as string) : undefined,
-        url: isApi ? (item.url as string) : undefined,
+        _categoryId: category.id,
+        name: (value.name as string) || key.replace(category.prefix, ""),
+        content: category.extractContent(value),
+        savedAt: (value.savedAt as number) || 0,
+        ...category.extractMeta?.(value),
       });
     }
 
@@ -106,9 +159,16 @@ export function ResourceManager() {
     loadAll();
   }, [loadAll]);
 
+  // 分类计数
+  const categoryCounts = allCategories.map((c) => ({
+    ...c,
+    count: allItems.filter((item) => item._categoryId === c.id).length,
+  }));
+
   // 筛选
   const filteredItems = allItems.filter((item) => {
-    if (showSource !== "all" && item.source !== showSource) return false;
+    if (activeCategory !== "all" && item._categoryId !== activeCategory)
+      return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       if (
@@ -129,7 +189,7 @@ export function ResourceManager() {
     }
   };
 
-  // 新建资源
+  // 新建资源（手动分类）
   const handleCreate = async () => {
     if (!newName.trim() || !newContent.trim()) return;
     await kvSet(`manual:saved:${newName}`, {
@@ -215,9 +275,10 @@ export function ResourceManager() {
       <header className="h-14 border-b border-separator flex items-center px-5 gap-2 shrink-0">
         <Database size={16} className="text-accent" />
         <h1 className="text-sm font-semibold">资源管理</h1>
+        <span className="text-[11px] text-muted hidden sm:inline">数据存储在浏览器本地</span>
         <div className="flex-1" />
         <Chip size="sm" variant="soft" color="default">
-          <Chip.Label>{filteredItems.length} 条</Chip.Label>
+          <Chip.Label>{allItems.length} 条</Chip.Label>
         </Chip>
         <Button
           size="sm"
@@ -248,175 +309,196 @@ export function ResourceManager() {
         />
       </header>
 
-      {/* 筛选栏 */}
-      <div className="px-4 py-3 bg-surface border-b border-separator">
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 p-1 bg-background rounded-lg border border-separator">
-            {(["all", "manual", "tool"] as const).map((s) => (
-              <Button
-                key={s}
-                size="sm"
-                variant={showSource === s ? "primary" : "ghost"}
-                className="text-xs px-4"
-                onPress={() => setShowSource(s)}
-              >
-                {s === "all"
-                  ? "全部"
-                  : s === "manual"
-                    ? "手动创建"
-                    : "工具保存"}
-              </Button>
-            ))}
+      {/* 主体：左侧分类 + 右侧列表 */}
+      <div className="flex-1 flex min-h-0">
+        {/* 左侧分类导航 */}
+        <aside className="w-48 border-r border-separator bg-surface flex flex-col shrink-0">
+          <div className="p-3 space-y-0.5 flex-1 overflow-y-auto">
+            {/* 全部 */}
+            <button
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+                activeCategory === "all"
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-surface-secondary text-muted"
+              }`}
+              onClick={() => setActiveCategory("all")}
+            >
+              <FolderOpen
+                size={14}
+                className={activeCategory === "all" ? "text-accent" : ""}
+              />
+              <span className="flex-1 text-left">全部资源</span>
+              <span className="text-[10px] text-muted tabular-nums">
+                {allItems.length}
+              </span>
+            </button>
+
+            <div className="h-px bg-separator my-2" />
+
+            {/* 各工具分类 */}
+            {categoryCounts.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+                    activeCategory === cat.id
+                      ? "bg-secondary text-secondary-foreground"
+                      : "hover:bg-surface-secondary text-muted"
+                  }`}
+                  onClick={() => setActiveCategory(cat.id)}
+                >
+                  <Icon
+                    size={14}
+                    className={activeCategory === cat.id ? "text-accent" : ""}
+                  />
+                  <span className="flex-1 text-left truncate">{cat.name}</span>
+                  {cat.count > 0 && (
+                    <span className="text-[10px] text-muted tabular-nums">
+                      {cat.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex-1" />
-          <Input
-            className="w-56"
-            placeholder="搜索资源..."
-            value={searchQuery}
-            onChange={(e) =>
-              setSearchQuery((e.target as HTMLInputElement).value)
-            }
-          />
-        </div>
-      </div>
+        </aside>
 
-      {/* 提示 */}
-      <div className="px-4 pt-3">
-        <Alert>
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>数据存储说明</Alert.Title>
-            <Alert.Description>
-              所有数据存储在浏览器本地，不支持跨设备同步。如需迁移数据，请使用上方的"导出"和"导入"功能。
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      </div>
-
-      {/* 列表 */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted gap-4">
-            <Database size={40} className="opacity-20" />
-            <div className="text-center">
-              <p className="text-sm font-medium">
-                {allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}
-              </p>
-              <p className="text-xs mt-1">
-                {allItems.length === 0
-                  ? "点击上方「新建」按钮创建第一个资源"
-                  : "尝试切换筛选条件或修改搜索关键词"}
-              </p>
-            </div>
-            {allItems.length === 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={() => setCreateModalOpen(true)}
-              >
-                <Plus size={14} />
-                <span className="text-xs">新建资源</span>
-              </Button>
+        {/* 右侧内容区 */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* 搜索栏 */}
+          <div className="px-4 py-3 border-b border-separator flex items-center gap-3">
+            <Input
+              className="w-64"
+              placeholder="搜索资源..."
+              value={searchQuery}
+              onChange={(e) =>
+                setSearchQuery((e.target as HTMLInputElement).value)
+              }
+            />
+            <div className="flex-1" />
+            {activeCategory !== "all" && (
+              <Chip size="sm" variant="soft" color="default">
+                <Chip.Label>
+                  {allCategories.find((c) => c.id === activeCategory)?.name}
+                </Chip.Label>
+              </Chip>
             )}
           </div>
-        ) : (
-          <div className="grid gap-2">
-            {filteredItems.map((item) => (
-              <div
-                key={item._key}
-                className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-separator hover:border-accent/30 transition-colors group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color={item.source === "manual" ? "success" : "accent"}
-                    >
-                      <Chip.Label className="text-xs">
-                        {item.source === "manual"
-                          ? "手动"
-                          : item.toolName || "工具"}
-                      </Chip.Label>
-                    </Chip>
-                    {item.method && (
-                      <Chip size="sm" variant="soft" color="accent">
-                        <Chip.Label className="font-mono text-xs">
-                          {item.method}
-                        </Chip.Label>
-                      </Chip>
-                    )}
-                    <span className="text-sm font-medium truncate">
-                      {item.name}
-                    </span>
-                  </div>
-                  {item.url && (
-                    <p className="text-xs text-muted truncate mt-0.5 font-mono">
-                      {item.url}
-                    </p>
-                  )}
-                  <div className="text-xs text-muted mt-1 flex items-center gap-1">
-                    <Clock size={10} />
-                    {item.savedAt
-                      ? new Date(item.savedAt).toLocaleString()
-                      : ""}
-                  </div>
+
+          {/* 列表 */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {filteredItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-muted gap-4">
+                <Database size={40} className="opacity-20" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">
+                    {allItems.length === 0 ? "暂无资源" : "没有匹配的资源"}
+                  </p>
+                  <p className="text-xs mt-1">
+                    {allItems.length === 0
+                      ? "在各工具中保存的内容会出现在这里"
+                      : "尝试切换分类或修改搜索关键词"}
+                  </p>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Tooltip delay={0}>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        setDetailItem(item);
-                        setDetailOpen(true);
-                      }}
-                    >
-                      <Eye size={14} />
-                    </Button>
-                    <Tooltip.Content>查看</Tooltip.Content>
-                  </Tooltip>
-                  {item.source === "tool" && (
-                    <Tooltip delay={0}>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => {
-                          let toolId = "api-request";
-                          if (item._key.startsWith("html-selector:"))
-                            toolId = "html-selector";
-                          else if (item._key.startsWith("api-request:"))
-                            toolId = "api-request";
-                          else if (item._key.startsWith("regex:"))
-                            toolId = "regex-tester";
-                          else if (item._key.startsWith("notes:"))
-                            toolId = "markdown";
-                          window.location.href = `/tools/${toolId}`;
-                        }}
-                      >
-                        <ExternalLink size={14} />
-                      </Button>
-                      <Tooltip.Content>打开工具</Tooltip.Content>
-                    </Tooltip>
-                  )}
-                  <Tooltip delay={0}>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => handleDelete(item._key)}
-                    >
-                      <Trash2 size={14} className="text-danger" />
-                    </Button>
-                    <Tooltip.Content>删除</Tooltip.Content>
-                  </Tooltip>
-                </div>
+                {activeCategory === "all" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => setCreateModalOpen(true)}
+                  >
+                    <Plus size={14} />
+                    <span className="text-xs">新建资源</span>
+                  </Button>
+                )}
               </div>
-            ))}
+            ) : (
+              <div className="grid gap-2">
+                {filteredItems.map((item) => {
+                  const category = allCategories.find(
+                    (c) => c.id === item._categoryId,
+                  );
+                  const Icon = category?.icon || Database;
+                  return (
+                    <div
+                      key={item._key}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-separator hover:border-accent/30 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Icon size={14} className="text-muted shrink-0" />
+                          <span className="text-sm font-medium truncate">
+                            {item.name}
+                          </span>
+                          {item.method && (
+                            <Chip size="sm" variant="soft" color="accent">
+                              <Chip.Label className="font-mono text-xs">
+                                {item.method}
+                              </Chip.Label>
+                            </Chip>
+                          )}
+                        </div>
+                        {item.url && (
+                          <p className="text-xs text-muted truncate mt-0.5 font-mono ml-[22px]">
+                            {item.url}
+                          </p>
+                        )}
+                        <div className="text-xs text-muted mt-1 flex items-center gap-1 ml-[22px]">
+                          <Clock size={10} />
+                          {item.savedAt
+                            ? new Date(item.savedAt).toLocaleString()
+                            : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Tooltip delay={0}>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="ghost"
+                            onPress={() => {
+                              setDetailItem(item);
+                              setDetailOpen(true);
+                            }}
+                          >
+                            <Eye size={14} />
+                          </Button>
+                          <Tooltip.Content>查看</Tooltip.Content>
+                        </Tooltip>
+                        {category?.href && (
+                          <Tooltip delay={0}>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              onPress={() => {
+                                window.location.href = category.href;
+                              }}
+                            >
+                              <ExternalLink size={14} />
+                            </Button>
+                            <Tooltip.Content>打开工具</Tooltip.Content>
+                          </Tooltip>
+                        )}
+                        <Tooltip delay={0}>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="ghost"
+                            onPress={() => handleDelete(item._key)}
+                          >
+                            <Trash2 size={14} className="text-danger" />
+                          </Button>
+                          <Tooltip.Content>删除</Tooltip.Content>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* 详情 Modal */}

@@ -244,7 +244,7 @@ export function SimpleEditor({
         editor.commands.setContent(initialContent, { emitUpdate: false })
         // 找到 history 插件并清空
         const histPlugin = editor.state.plugins.find(
-          (p) => p.key.startsWith("history")
+          (p) => (p as any).key?.startsWith?.("history") ?? false
         )
         if (histPlugin) {
           const histState = histPlugin.getState(editor.state)
