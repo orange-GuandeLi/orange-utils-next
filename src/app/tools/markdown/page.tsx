@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Button, Input, Tooltip, Modal, Label, TextField, Chip } from "@heroui/react";
-import { Save, FolderOpen, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { Button, Input, Tooltip, Modal, Label, TextField, Chip, toast } from "@heroui/react";
+import { Save, FolderOpen, Trash2, FileDown } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "@/utils/db";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
+import { useSearchParams } from "next/navigation";
 
 type SavedNote = {
   name: string;
@@ -13,14 +14,40 @@ type SavedNote = {
 };
 
 export default function NotesPage() {
+  return (
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted text-sm">加载中...</div>}>
+      <NotesEditor />
+    </Suspense>
+  );
+}
+
+function NotesEditor() {
+  const searchParams = useSearchParams();
   const [content, setContent] = useState("");
   const [dirty, setDirty] = useState(false);
+
+  // 当前加载的笔记名称（用于覆盖保存）
+  const [currentName, setCurrentName] = useState<string | null>(null);
 
   // 保存/加载 Modal
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [loadModalOpen, setLoadModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [savedItems, setSavedItems] = useState<SavedNote[]>([]);
+
+  // URL 参数加载
+  useEffect(() => {
+    const loadName = searchParams.get("load");
+    if (!loadName) return;
+    (async () => {
+      const item = await kvGet<SavedNote>(`notes:saved:${loadName}`);
+      if (item) {
+        setContent(item.content);
+        setCurrentName(item.name);
+        setDirty(false);
+      }
+    })();
+  }, [searchParams]);
 
   // 加载已保存列表
   const loadSavedList = useCallback(async () => {
@@ -42,8 +69,25 @@ export default function NotesPage() {
     }
   }, [loadModalOpen, loadSavedList]);
 
-  // 保存
+  // 保存（有 currentName 则覆盖，否则新建）
   const handleSave = async () => {
+    // 如果已加载笔记，直接覆盖，不弹 Modal
+    if (currentName) {
+      await kvSet(`notes:saved:${currentName}`, {
+        name: currentName,
+        content,
+        savedAt: Date.now(),
+      });
+      setDirty(false);
+      toast.success(`已保存「${currentName}」`);
+      return;
+    }
+    // 否则弹 Modal 让用户输入名称
+    setSaveName("");
+    setSaveModalOpen(true);
+  };
+
+  const handleSaveConfirm = async () => {
     const name = saveName.trim();
     if (!name) return;
     await kvSet(`notes:saved:${name}`, {
@@ -51,14 +95,17 @@ export default function NotesPage() {
       content,
       savedAt: Date.now(),
     });
+    setCurrentName(name);
     setSaveModalOpen(false);
     setSaveName("");
     setDirty(false);
+    toast.success(`已保存「${name}」`);
   };
 
   // 加载
   const handleLoad = (item: SavedNote) => {
     setContent(item.content);
+    setCurrentName(item.name);
     setLoadModalOpen(false);
     setDirty(false);
   };
@@ -66,7 +113,14 @@ export default function NotesPage() {
   // 删除
   const handleDelete = async (item: SavedNote) => {
     await kvDelete(`notes:saved:${item.name}`);
+    if (currentName === item.name) setCurrentName(null);
     loadSavedList();
+  };
+
+  // 另存为
+  const handleSaveAs = () => {
+    setSaveName(currentName || "");
+    setSaveModalOpen(true);
   };
 
   return (
@@ -78,21 +132,40 @@ export default function NotesPage() {
           富文本编辑 → 保存资源 → 统一管理
         </span>
         <div className="flex-1" />
+        {currentName && (
+          <Chip size="sm" variant="soft" color="default">
+            <Chip.Label>{currentName}</Chip.Label>
+          </Chip>
+        )}
         {dirty && (
           <Chip size="sm" variant="soft" color="warning">
             <Chip.Label>未保存</Chip.Label>
           </Chip>
         )}
         <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setSaveModalOpen(true)}>
-            <Save size={14} />
-          </Button>
-          <Tooltip.Content>保存</Tooltip.Content>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
+              <Save size={14} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{currentName ? `覆盖保存「${currentName}」` : "保存"}</Tooltip.Content>
         </Tooltip>
+        {currentName && (
+          <Tooltip delay={0}>
+            <Tooltip.Trigger className="flex flex-col">
+              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
+                <FileDown size={14} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>另存为</Tooltip.Content>
+          </Tooltip>
+        )}
         <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
-            <FolderOpen size={14} />
-          </Button>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
+              <FolderOpen size={14} />
+            </Button>
+          </Tooltip.Trigger>
           <Tooltip.Content>加载</Tooltip.Content>
         </Tooltip>
       </header>
@@ -115,17 +188,17 @@ export default function NotesPage() {
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Icon className="bg-accent-soft text-accent"><Save className="size-5" /></Modal.Icon>
-              <Modal.Heading>保存笔记</Modal.Heading>
+              <Modal.Heading>{currentName ? "另存为" : "保存笔记"}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <TextField value={saveName} onChange={setSaveName}>
                 <Label>名称</Label>
-                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
               </TextField>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSave} isDisabled={!saveName.trim()}>保存</Button>
+              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
@@ -157,9 +230,11 @@ export default function NotesPage() {
                         </div>
                       </div>
                       <Tooltip delay={0}>
-                        <Button isIconOnly size="sm" variant="ghost" className="text-muted" onPress={() => handleDelete(item)}>
-                          <Trash2 size={14} />
-                        </Button>
+                        <Tooltip.Trigger className="flex flex-col">
+                          <Button isIconOnly size="sm" variant="ghost" className="text-muted" onPress={() => handleDelete(item)}>
+                            <Trash2 size={14} />
+                          </Button>
+                        </Tooltip.Trigger>
                         <Tooltip.Content>删除</Tooltip.Content>
                       </Tooltip>
                     </div>

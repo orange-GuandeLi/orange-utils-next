@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Modal, Input, Label, TextField } from "@heroui/react";
+import { Button, Chip, Tooltip, Modal, Input, Label, TextField, toast } from "@heroui/react";
 import {
   SquareDashedMousePointer,
   Copy,
@@ -10,6 +10,7 @@ import {
   Save,
   FolderOpen,
   Trash2,
+  FileDown,
 } from "lucide-react";
 import { CodeEditor } from "./CodeEditor";
 import {
@@ -51,11 +52,13 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function HtmlSelector() {
+export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) {
   const [html, setHtml] = useState(SAMPLE_HTML);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedInfo, setSelectedInfo] = useState<SelectionInfo | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [currentName, setCurrentName] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // 分隔条
@@ -100,6 +103,21 @@ export function HtmlSelector() {
     setModalOpen(false);
   }, []);
 
+  useEffect(() => {
+    if (!initialLoadName) return;
+    (async () => {
+      const item = await kvGet<SavedItem>(STORAGE_PREFIX + initialLoadName);
+      if (item) {
+        setHtml(item.html);
+        setCurrentName(item.name);
+        setDirty(false);
+        setSelectMode(false);
+        setSelectedInfo(null);
+        setModalOpen(false);
+      }
+    })();
+  }, [initialLoadName]);
+
   useIframeSelector({
     iframeRef,
     selectMode,
@@ -130,17 +148,39 @@ export function HtmlSelector() {
 
   // 保存
   const handleSave = async () => {
+    if (currentName) {
+      const item: SavedItem = { name: currentName, html, savedAt: Date.now() };
+      await kvSet(STORAGE_PREFIX + currentName, item);
+      setDirty(false);
+      toast.success(`已保存「${currentName}」`);
+      return;
+    }
+    setSaveName("");
+    setSaveModalOpen(true);
+  };
+
+  const handleSaveConfirm = async () => {
     const name = saveName.trim();
     if (!name) return;
     const item: SavedItem = { name, html, savedAt: Date.now() };
     await kvSet(STORAGE_PREFIX + name, item);
+    setCurrentName(name);
     setSaveModalOpen(false);
     setSaveName("");
+    setDirty(false);
+    toast.success(`已保存「${name}」`);
+  };
+
+  const handleSaveAs = () => {
+    setSaveName(currentName || "");
+    setSaveModalOpen(true);
   };
 
   // 加载
   const handleLoad = (item: SavedItem) => {
     setHtml(item.html);
+    setCurrentName(item.name);
+    setDirty(false);
     setSelectMode(false);
     setSelectedInfo(null);
     setModalOpen(false);
@@ -150,6 +190,7 @@ export function HtmlSelector() {
   // 删除
   const handleDelete = async (item: SavedItem) => {
     await kvDelete(STORAGE_PREFIX + item.name);
+    if (currentName === item.name) setCurrentName(null);
     loadSavedList();
   };
 
@@ -191,15 +232,33 @@ export function HtmlSelector() {
           粘贴 HTML → 实时预览 → 选择元素 → 查看信息
         </span>
         <div className="flex-1" />
+        {currentName && (
+          <Chip size="sm" variant="soft" color="default">
+            <Chip.Label>{currentName}</Chip.Label>
+          </Chip>
+        )}
+        {dirty && (
+          <Chip size="sm" variant="soft" color="warning">
+            <Chip.Label>未保存</Chip.Label>
+          </Chip>
+        )}
         <Chip size="sm" variant="soft" color="default" className="font-mono">
           <Chip.Label>{previewPx}px</Chip.Label>
         </Chip>
         <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setSaveModalOpen(true)}>
+          <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
             <Save size={14} />
           </Button>
-          <Tooltip.Content>保存</Tooltip.Content>
+          <Tooltip.Content>{currentName ? `覆盖保存「${currentName}」` : "保存"}</Tooltip.Content>
         </Tooltip>
+        {currentName && (
+          <Tooltip delay={0}>
+            <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
+              <FileDown size={14} />
+            </Button>
+            <Tooltip.Content>另存为</Tooltip.Content>
+          </Tooltip>
+        )}
         <Tooltip delay={0}>
           <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
             <FolderOpen size={14} />
@@ -255,6 +314,7 @@ export function HtmlSelector() {
               value={html}
               onChange={(v) => {
                 setHtml(v);
+                setDirty(true);
                 setSelectMode(false);
                 setSelectedInfo(null);
                 setModalOpen(false);
@@ -335,7 +395,7 @@ export function HtmlSelector() {
               <Modal.Icon className="bg-accent-soft text-accent">
                 <Save className="size-5" />
               </Modal.Icon>
-              <Modal.Heading>保存代码</Modal.Heading>
+              <Modal.Heading>{currentName ? "另存为" : "保存代码"}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <TextField
@@ -343,12 +403,12 @@ export function HtmlSelector() {
                 onChange={setSaveName}
               >
                 <Label>名称</Label>
-                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
               </TextField>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSave} isDisabled={!saveName.trim()}>保存</Button>
+              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Button, Chip, Tooltip, Input, Modal, Label, TextField } from "@heroui/react";
-import { Regex, Copy, Check, Save, FolderOpen, Trash2 } from "lucide-react";
+import { Button, Chip, Tooltip, Input, Modal, Label, TextField, toast } from "@heroui/react";
+import { Regex, Copy, Check, Save, FolderOpen, Trash2, FileDown } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 
 type MatchResult = {
@@ -19,7 +19,7 @@ const FLAG_OPTIONS = [
   { id: "s", name: "s", description: "点号匹配换行" },
 ];
 
-export function RegexTester() {
+export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
   const [pattern, setPattern] = useState("");
   const [flags, setFlags] = useState<Set<string>>(new Set(["g"]));
   const [testString, setTestString] = useState("");
@@ -28,6 +28,8 @@ export function RegexTester() {
   const [loadModalOpen, setLoadModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [savedItems, setSavedItems] = useState<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }[]>([]);
+  const [currentName, setCurrentName] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
 
   // 加载已保存列表
   const loadSavedList = useCallback(async () => {
@@ -50,8 +52,41 @@ export function RegexTester() {
     }
   }, [loadModalOpen, loadSavedList]);
 
+  // 从 URL 参数加载已保存的正则
+  useEffect(() => {
+    if (!initialLoadName) return;
+    (async () => {
+      const item = await kvGet<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }>(`regex:saved:${initialLoadName}`);
+      if (item) {
+        setPattern(item.pattern);
+        setFlags(new Set(item.flags));
+        setTestString(item.testString);
+        setCurrentName(item.name);
+        setDirty(false);
+      }
+    })();
+  }, [initialLoadName]);
+
   // 保存
   const handleSave = async () => {
+    if (currentName) {
+      await kvSet(`regex:saved:${currentName}`, {
+        name: currentName,
+        pattern,
+        flags: Array.from(flags),
+        testString,
+        savedAt: Date.now(),
+      });
+      setDirty(false);
+      toast.success(`已保存「${currentName}」`);
+      return;
+    }
+    setSaveName("");
+    setSaveModalOpen(true);
+  };
+
+  // 保存确认（新建名称）
+  const handleSaveConfirm = async () => {
     if (!saveName.trim()) return;
     await kvSet(`regex:saved:${saveName}`, {
       name: saveName,
@@ -60,22 +95,34 @@ export function RegexTester() {
       testString,
       savedAt: Date.now(),
     });
+    setCurrentName(saveName);
     setSaveModalOpen(false);
     setSaveName("");
+    setDirty(false);
+    toast.success(`已保存「${saveName}」`);
   };
 
   // 加载
-  const handleLoad = (item: { pattern: string; flags: string[]; testString: string }) => {
+  const handleLoad = (item: { name: string; pattern: string; flags: string[]; testString: string }) => {
     setPattern(item.pattern);
     setFlags(new Set(item.flags));
     setTestString(item.testString);
+    setCurrentName(item.name);
+    setDirty(false);
     setLoadModalOpen(false);
   };
 
   // 删除
   const handleDelete = async (name: string) => {
     await kvDelete(`regex:saved:${name}`);
+    if (currentName === name) setCurrentName(null);
     loadSavedList();
+  };
+
+  // 另存为
+  const handleSaveAs = () => {
+    setSaveName(currentName || "");
+    setSaveModalOpen(true);
   };
 
   // 计算匹配结果
@@ -164,6 +211,7 @@ export function RegexTester() {
       else next.add(flag);
       return next;
     });
+    setDirty(true);
   };
 
   const copyPattern = () => {
@@ -186,6 +234,42 @@ export function RegexTester() {
             {error ? "语法错误" : pattern ? `${matches.length} 个匹配` : "输入正则"}
           </Chip.Label>
         </Chip>
+        {currentName && (
+          <Chip size="sm" variant="soft" color="accent" className="max-w-[120px] truncate">
+            <Chip.Label className="text-xs">{currentName}</Chip.Label>
+          </Chip>
+        )}
+        {dirty && (
+          <Chip size="sm" variant="soft" color="warning">
+            <Chip.Label>未保存</Chip.Label>
+          </Chip>
+        )}
+        <Tooltip delay={0}>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}>
+              <Save size={14} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{currentName ? `保存「${currentName}」` : "保存正则"}</Tooltip.Content>
+        </Tooltip>
+        {currentName && (
+          <Tooltip delay={0}>
+            <Tooltip.Trigger className="flex flex-col">
+              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}>
+                <FileDown size={14} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>另存为</Tooltip.Content>
+          </Tooltip>
+        )}
+        <Tooltip delay={0}>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
+              <FolderOpen size={14} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>加载正则</Tooltip.Content>
+        </Tooltip>
       </header>
 
       {/* 正则输入 */}
@@ -196,7 +280,7 @@ export function RegexTester() {
             className="flex-1 font-mono"
             placeholder="输入正则表达式..."
             value={pattern}
-            onChange={(e) => setPattern((e.target as HTMLInputElement).value)}
+            onChange={(e) => { setPattern((e.target as HTMLInputElement).value); setDirty(true); }}
           />
           <span className="text-muted text-sm">/</span>
           <div className="flex gap-1">
@@ -217,18 +301,6 @@ export function RegexTester() {
               {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
             </Button>
             <Tooltip.Content>{copied ? "已复制" : "复制正则"}</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setSaveModalOpen(true)}>
-              <Save size={14} />
-            </Button>
-            <Tooltip.Content>保存正则</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}>
-              <FolderOpen size={14} />
-            </Button>
-            <Tooltip.Content>加载正则</Tooltip.Content>
           </Tooltip>
         </div>
         {error && (
@@ -263,7 +335,7 @@ export function RegexTester() {
               style={{ color: highlightedText ? "transparent" : undefined, caretColor: "var(--foreground)" }}
               placeholder="输入要测试的文本..."
               value={testString}
-              onChange={(e) => setTestString(e.target.value)}
+              onChange={(e) => { setTestString(e.target.value); setDirty(true); }}
             />
           </div>
         </div>
@@ -322,17 +394,17 @@ export function RegexTester() {
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Icon className="bg-accent-soft text-accent"><Save className="size-5" /></Modal.Icon>
-              <Modal.Heading>保存正则</Modal.Heading>
+              <Modal.Heading>{currentName ? "另存为" : "保存正则"}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <TextField value={saveName} onChange={setSaveName}>
                 <Label>名称</Label>
-                <Input placeholder="给这个正则起个名字" onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+                <Input placeholder="给这个正则起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
               </TextField>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSave} isDisabled={!saveName.trim()}>保存</Button>
+              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

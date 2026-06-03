@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toast } from "@heroui/react";
 import { Sidebar } from "@/components/Sidebar";
 
 const geistSans = Geist({
@@ -56,6 +57,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex bg-background text-foreground`}
       >
+        <Toast.Provider />
         <Sidebar />
         <main className="flex-1 min-w-0">{children}</main>
       </body>

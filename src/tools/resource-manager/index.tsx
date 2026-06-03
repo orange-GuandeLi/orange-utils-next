@@ -472,7 +472,10 @@ export function ResourceManager() {
                               size="sm"
                               variant="ghost"
                               onPress={() => {
-                                window.location.href = category.href;
+                                const url = item.name
+                                  ? `${category.href}?load=${encodeURIComponent(item.name)}`
+                                  : category.href;
+                                window.location.href = url;
                               }}
                             >
                               <ExternalLink size={14} />

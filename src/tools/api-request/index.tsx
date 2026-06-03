@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Modal, Input, Label, TextField, Select, ListBox, Tabs } from "@heroui/react";
-import { Send, Save, FolderOpen, Trash2, Plus, X, Copy, Check } from "lucide-react";
+import { Button, Chip, Tooltip, Modal, Input, Label, TextField, Select, ListBox, Tabs, toast } from "@heroui/react";
+import { Send, Save, FolderOpen, Trash2, Plus, X, Copy, Check, FileDown } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
 import { CodeEditor } from "../../components/CodeEditor";
 
@@ -11,7 +11,7 @@ type ResponseData = { status: number; statusText: string; headers: Record<string
 const STORAGE_PREFIX = "api-request:saved:";
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
-export function ApiRequest() {
+export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   const [method, setMethod] = useState("GET");
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState<Header[]>([{ key: "Content-Type", value: "application/json" }]);
@@ -24,6 +24,8 @@ export function ApiRequest() {
   const [loadModalOpen, setLoadModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [savedItems, setSavedItems] = useState<RequestConfig[]>([]);
+  const [currentName, setCurrentName] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
 
   const [varModalOpen, setVarModalOpen] = useState(false);
   const [availableVars, setAvailableVars] = useState<{ key: string; value: string }[]>([]);
@@ -99,26 +101,45 @@ export function ApiRequest() {
     } finally { setLoading(false); }
   };
 
-  const addHeader = () => setHeaders([...headers, { key: "", value: "" }]);
-  const removeHeader = (i: number) => setHeaders(headers.filter((_, idx) => idx !== i));
+  const addHeader = () => { setHeaders([...headers, { key: "", value: "" }]); setDirty(true); };
+  const removeHeader = (i: number) => { setHeaders(headers.filter((_, idx) => idx !== i)); setDirty(true); };
   const updateHeader = (i: number, field: "key" | "value", val: string) => {
-    const next = [...headers]; next[i] = { ...next[i], [field]: val }; setHeaders(next);
+    const next = [...headers]; next[i] = { ...next[i], [field]: val }; setHeaders(next); setDirty(true);
   };
 
   const handleSave = async () => {
+    if (currentName) {
+      await kvSet(STORAGE_PREFIX + currentName, { name: currentName, method, url, headers, body, savedAt: Date.now() });
+      setDirty(false);
+      toast.success(`已保存「${currentName}」`);
+      return;
+    }
+    setSaveName("");
+    setSaveModalOpen(true);
+  };
+
+  const handleSaveConfirm = async () => {
     const name = saveName.trim();
     if (!name) return;
     await kvSet(STORAGE_PREFIX + name, { name, method, url, headers, body, savedAt: Date.now() });
+    setCurrentName(name);
     setSaveModalOpen(false); setSaveName("");
+    setDirty(false);
+    toast.success(`已保存「${name}」`);
   };
 
   const handleLoad = (item: RequestConfig) => {
     setMethod(item.method); setUrl(item.url);
     setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }]);
-    setBody(item.body); setLoadModalOpen(false);
+    setBody(item.body);
+    setCurrentName(item.name);
+    setDirty(false);
+    setLoadModalOpen(false);
   };
 
-  const handleDelete = async (item: RequestConfig) => { await kvDelete(STORAGE_PREFIX + item.name); loadSavedList(); };
+  const handleDelete = async (item: RequestConfig) => { await kvDelete(STORAGE_PREFIX + item.name); if (currentName === item.name) setCurrentName(null); loadSavedList(); };
+
+  const handleSaveAs = () => { setSaveName(currentName || ""); setSaveModalOpen(true); };
 
   const [copied, setCopied] = useState(false);
   const handleCopyResponse = () => {
@@ -126,6 +147,21 @@ export function ApiRequest() {
     navigator.clipboard.writeText(response.body);
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
+
+  useEffect(() => {
+    if (!initialLoadName) return;
+    (async () => {
+      const item = await kvGet<RequestConfig>(STORAGE_PREFIX + initialLoadName);
+      if (item) {
+        setMethod(item.method);
+        setUrl(item.url);
+        setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }]);
+        setBody(item.body);
+        setCurrentName(item.name);
+        setDirty(false);
+      }
+    })();
+  }, [initialLoadName]);
 
   const insertVar = (varKey: string) => { setBody((prev) => prev + varKey); setVarModalOpen(false); };
 
@@ -136,12 +172,34 @@ export function ApiRequest() {
         <h1 className="text-sm font-semibold">API 请求</h1>
         <span className="text-xs text-muted">发送 HTTP 请求，支持模板变量引用其他工具的数据</span>
         <div className="flex-1" />
+        {currentName && (
+          <Chip size="sm" variant="soft" color="accent">
+            <Chip.Label>{currentName}</Chip.Label>
+          </Chip>
+        )}
+        {dirty && (
+          <Chip size="sm" variant="soft" color="warning">
+            <Chip.Label>未保存</Chip.Label>
+          </Chip>
+        )}
         <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setSaveModalOpen(true)}><Save size={14} /></Button>
-          <Tooltip.Content>保存请求</Tooltip.Content>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={handleSave}><Save size={14} /></Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{currentName ? `保存到 ${currentName}` : "保存请求"}</Tooltip.Content>
         </Tooltip>
+        {currentName && (
+          <Tooltip delay={0}>
+            <Tooltip.Trigger className="flex flex-col">
+              <Button isIconOnly size="sm" variant="ghost" onPress={handleSaveAs}><FileDown size={14} /></Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>另存为</Tooltip.Content>
+          </Tooltip>
+        )}
         <Tooltip delay={0}>
-          <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}><FolderOpen size={14} /></Button>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" onPress={() => setLoadModalOpen(true)}><FolderOpen size={14} /></Button>
+          </Tooltip.Trigger>
           <Tooltip.Content>加载请求</Tooltip.Content>
         </Tooltip>
       </header>
@@ -152,7 +210,7 @@ export function ApiRequest() {
         <div className="w-1/2 border-r border-separator flex flex-col overflow-hidden">
           {/* URL 行 */}
           <div className="flex items-center gap-2 p-3 border-b border-separator shrink-0">
-            <Select className="w-28" placeholder="GET" selectedKey={method} onSelectionChange={(key) => { if (key) setMethod(key as string); }}>
+            <Select className="w-28" placeholder="GET" selectedKey={method} onSelectionChange={(key) => { if (key) { setMethod(key as string); setDirty(true); } }}>
               <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
               <Select.Popover>
                 <ListBox>
@@ -160,7 +218,7 @@ export function ApiRequest() {
                 </ListBox>
               </Select.Popover>
             </Select>
-            <Input className="flex-1" placeholder="https://api.example.com/endpoint" value={url} onChange={(e) => setUrl((e.target as HTMLInputElement).value)} />
+            <Input className="flex-1" placeholder="https://api.example.com/endpoint" value={url} onChange={(e) => { setUrl((e.target as HTMLInputElement).value); setDirty(true); }} />
             <Button size="sm" className="text-xs" variant="primary" onPress={handleSend} isDisabled={loading}>
               <Send size={14} />{loading ? "发送中..." : "发送"}
             </Button>
@@ -194,7 +252,7 @@ export function ApiRequest() {
                 </Tooltip>
               </div>
               <div className="flex-1 min-h-0">
-                <CodeEditor value={body} onChange={setBody} language="json" />
+                <CodeEditor value={body} onChange={(v) => { setBody(v); setDirty(true); }} language="json" />
               </div>
             </Tabs.Panel>
 
@@ -254,17 +312,17 @@ export function ApiRequest() {
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Icon className="bg-accent-soft text-accent"><Save className="size-5" /></Modal.Icon>
-              <Modal.Heading>保存请求</Modal.Heading>
+              <Modal.Heading>{currentName ? "另存为" : "保存请求"}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <TextField value={saveName} onChange={setSaveName}>
                 <Label>名称</Label>
-                <Input placeholder="给这个请求起个名字" onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+                <Input placeholder="给这个请求起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
               </TextField>
             </Modal.Body>
             <Modal.Footer>
               <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSave} isDisabled={!saveName.trim()}>保存</Button>
+              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
