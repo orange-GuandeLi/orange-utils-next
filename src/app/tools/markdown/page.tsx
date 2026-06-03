@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { Button, Input, Tooltip, Modal, Label, TextField, Chip, toast } from "@heroui/react";
 import { Save, FolderOpen, Trash2, FileDown } from "lucide-react";
+import { LoadModal } from "@/components/LoadModal";
+import { SaveModal } from "@/components/SaveModal";
 import { kvGet, kvSet, kvDelete, kvKeys } from "@/utils/db";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { useSearchParams } from "next/navigation";
@@ -26,7 +28,7 @@ function NotesEditor() {
   const [content, setContent] = useState("");
   const [dirty, setDirty] = useState(false);
 
-  // 当前加载的笔记名称（用于覆盖保存）
+  // 当前加载的Markdown名称（用于覆盖保存）
   const [currentName, setCurrentName] = useState<string | null>(null);
 
   // 保存/加载 Modal
@@ -71,7 +73,7 @@ function NotesEditor() {
 
   // 保存（有 currentName 则覆盖，否则新建）
   const handleSave = async () => {
-    // 如果已加载笔记，直接覆盖，不弹 Modal
+    // 如果已加载Markdown，直接覆盖，不弹 Modal
     if (currentName) {
       await kvSet(`notes:saved:${currentName}`, {
         name: currentName,
@@ -181,70 +183,25 @@ function NotesEditor() {
         />
       </div>
 
-      {/* 保存 Modal */}
-      <Modal.Backdrop isOpen={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-sm">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent"><Save className="size-5" /></Modal.Icon>
-              <Modal.Heading>{currentName ? "另存为" : "保存笔记"}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <TextField value={saveName} onChange={setSaveName}>
-                <Label>名称</Label>
-                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
-              </TextField>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <SaveModal
+        isOpen={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
+        title={currentName ? "另存为" : "保存Markdown"}
+        name={saveName}
+        onNameChange={setSaveName}
+        onSave={handleSaveConfirm}
+        placeholder="给这次保存起个名字"
+      />
 
-      {/* 打开 Modal */}
-      <Modal.Backdrop isOpen={loadModalOpen} onOpenChange={setLoadModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-md">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent"><FolderOpen className="size-5" /></Modal.Icon>
-              <Modal.Heading>加载已保存的笔记</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {savedItems.length === 0 ? (
-                <p className="text-sm text-muted text-center py-8">暂无保存的笔记</p>
-              ) : (
-                <div className="space-y-1 max-h-60 overflow-y-auto">
-                  {savedItems.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2 p-2 rounded hover:bg-surface-secondary">
-                      <div
-                        className="flex-1 min-w-0 cursor-pointer"
-                        onClick={() => handleLoad(item)}
-                      >
-                        <div className="text-sm font-medium truncate">{item.name}</div>
-                        <div className="text-xs text-muted">
-                          {new Date(item.savedAt).toLocaleString("zh-CN")}
-                        </div>
-                      </div>
-                      <Tooltip delay={0}>
-                        <Tooltip.Trigger className="flex flex-col">
-                          <Button isIconOnly size="sm" variant="ghost" className="text-muted" onPress={() => handleDelete(item)}>
-                            <Trash2 size={14} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>删除</Tooltip.Content>
-                      </Tooltip>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <LoadModal
+        isOpen={loadModalOpen}
+        onOpenChange={setLoadModalOpen}
+        title="加载已保存的Markdown"
+        items={savedItems}
+        onLoad={handleLoad}
+        onDelete={handleDelete}
+        emptyText="暂无保存的Markdown"
+      />
     </div>
   );
 }

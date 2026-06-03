@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Button, Chip, Tooltip, Input, Modal, Label, TextField, toast } from "@heroui/react";
-import { Regex, Copy, Check, Save, FolderOpen, Trash2, FileDown } from "lucide-react";
+import { Button, Chip, Tooltip, Input, toast } from "@heroui/react";
+import { Regex, Copy, Check, Save, FolderOpen, Trash2, FileDown, Plus } from "lucide-react";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
+import { LoadModal } from "../../components/LoadModal";
+import { SaveModal } from "../../components/SaveModal";
+import { ModalShell } from "../../components/ModalShell";
 
 type MatchResult = {
   text: string;
@@ -30,6 +33,8 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
   const [savedItems, setSavedItems] = useState<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }[]>([]);
   const [currentName, setCurrentName] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [varModalOpen, setVarModalOpen] = useState(false);
+  const [availableVars, setAvailableVars] = useState<{ id: string; name: string; toolName: string; content: string; savedAt: number }[]>([]);
 
   // 加载已保存列表
   const loadSavedList = useCallback(async () => {
@@ -215,10 +220,50 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
   };
 
   const copyPattern = () => {
-    const flagStr = Array.from(flags).join("");
-    navigator.clipboard.writeText(`/${pattern}/${flagStr}`);
+    navigator.clipboard.writeText(`/${pattern}/${Array.from(flags).join("")}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  // 工具名称映射
+  const TOOL_NAMES: Record<string, string> = {
+    "html-selector": "HTML 选择器",
+    "api-request": "API 请求",
+    "regex": "正则测试",
+    "notes": "Markdown",
+    "manual": "手动创建",
+  };
+
+  // 加载可用变量（其他工具保存的数据）
+  const loadAvailableVars = useCallback(async () => {
+    const keys = await kvKeys();
+    const vars: { id: string; name: string; toolName: string; content: string; savedAt: number }[] = [];
+    for (const key of keys) {
+      if (!key.includes(":saved:")) continue;
+      const item = await kvGet<Record<string, unknown>>(key);
+      if (!item) continue;
+      const name = (item.name as string) || key.replace(/^.*?:saved:/, "");
+      const content = (item.html as string) || (item.content as string) || (item.body as string) || (item.testString as string) || "";
+      const savedAt = (item.savedAt as number) || 0;
+      const toolPrefix = key.split(":")[0];
+      const toolName = TOOL_NAMES[toolPrefix] || toolPrefix;
+      if (content) vars.push({ id: key, name, toolName, content, savedAt });
+    }
+    vars.sort((a, b) => b.savedAt - a.savedAt);
+    setAvailableVars(vars);
+  }, []);
+
+  useEffect(() => {
+    if (varModalOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadAvailableVars();
+    }
+  }, [varModalOpen, loadAvailableVars]);
+
+  const insertVar = (content: string) => {
+    setTestString((prev) => prev + content);
+    setDirty(true);
+    setVarModalOpen(false);
   };
 
   return (
@@ -314,6 +359,10 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
         <div className="flex-1 flex flex-col min-w-0 border-r border-separator">
           <div className="h-9 px-4 flex items-center border-b border-separator bg-surface shrink-0">
             <span className="text-xs text-muted font-medium">测试文本</span>
+            <div className="flex-1" />
+            <Button size="sm" variant="ghost" onPress={() => setVarModalOpen(true)}>
+              <Plus size={12} /><span className="text-xs">插入变量</span>
+            </Button>
           </div>
           <div className="flex-1 relative">
             {/* 高亮层 */}
@@ -388,63 +437,60 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
         </div>
       </div>
       {/* 保存 Modal */}
-      <Modal.Backdrop isOpen={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-sm">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent"><Save className="size-5" /></Modal.Icon>
-              <Modal.Heading>{currentName ? "另存为" : "保存正则"}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <TextField value={saveName} onChange={setSaveName}>
-                <Label>名称</Label>
-                <Input placeholder="给这个正则起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
-              </TextField>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <SaveModal
+        isOpen={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
+        title={currentName ? "另存为" : "保存正则"}
+        name={saveName}
+        onNameChange={setSaveName}
+        onSave={handleSaveConfirm}
+        placeholder="给这个正则起个名字"
+      />
 
-      {/* 加载 Modal */}
-      <Modal.Backdrop isOpen={loadModalOpen} onOpenChange={setLoadModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-md">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent"><FolderOpen className="size-5" /></Modal.Icon>
-              <Modal.Heading>加载已保存的正则</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {savedItems.length === 0 ? (
-                <p className="text-sm text-muted text-center py-8">暂无保存的正则</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {savedItems.map((item) => (
-                    <div key={item.name} className="flex items-center gap-3 p-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <p className="text-xs text-muted font-mono truncate mt-0.5">/{item.pattern}/{item.flags.join("")}</p>
-                      </div>
-                      <Button size="sm" variant="secondary" onPress={() => handleLoad(item)}>加载</Button>
-                      <Tooltip delay={0}>
-                        <Button isIconOnly size="sm" variant="ghost" onPress={() => handleDelete(item.name)}>
-                          <Trash2 size={14} className="text-danger" />
-                        </Button>
-                        <Tooltip.Content>删除</Tooltip.Content>
-                      </Tooltip>
-                    </div>
-                  ))}
+      <LoadModal
+        isOpen={loadModalOpen}
+        onOpenChange={setLoadModalOpen}
+        title="加载已保存的正则"
+        items={savedItems}
+        onLoad={handleLoad}
+        onDelete={(item) => handleDelete(item.name)}
+        emptyText="暂无保存的正则"
+      />
+
+      {/* 插入变量 Modal */}
+      <ModalShell
+        isOpen={varModalOpen}
+        onOpenChange={setVarModalOpen}
+        title="插入变量"
+        icon={Plus}
+      >
+        <p className="text-xs text-muted mb-3">从其他工具保存的数据中选择内容，插入到测试文本中。</p>
+        {availableVars.length === 0 ? (
+          <p className="text-sm text-muted text-center py-4">暂无可用数据，请先在其他工具中保存内容</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableVars.map((v) => (
+              <div
+                key={v.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-surface-secondary cursor-pointer hover:bg-surface-tertiary transition-colors"
+                onClick={() => insertVar(v.content)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" variant="soft" color="default">
+                      <Chip.Label className="text-xs">{v.toolName}</Chip.Label>
+                    </Chip>
+                    <span className="text-sm font-medium truncate">{v.name}</span>
+                  </div>
+                  <div className="text-xs text-muted mt-0.5">
+                    {new Date(v.savedAt).toLocaleString("zh-CN")}
+                  </div>
                 </div>
-              )}
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+              </div>
+            ))}
+          </div>
+        )}
+      </ModalShell>
     </div>
   );
 }

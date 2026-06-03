@@ -9,7 +9,6 @@ import {
   Check,
   Save,
   FolderOpen,
-  Trash2,
   FileDown,
 } from "lucide-react";
 import { CodeEditor } from "./CodeEditor";
@@ -18,6 +17,8 @@ import {
   type SelectionInfo,
 } from "./hooks/useIframeSelector";
 import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
+import { LoadModal } from "../../components/LoadModal";
+import { SaveModal } from "../../components/SaveModal";
 
 // 保存的数据结构
 type SavedItem = {
@@ -386,81 +387,25 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
         </Modal.Backdrop>
       )}
 
-      {/* 保存 Modal */}
-      <Modal.Backdrop isOpen={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-sm">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent">
-                <Save className="size-5" />
-              </Modal.Icon>
-              <Modal.Heading>{currentName ? "另存为" : "保存代码"}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <TextField
-                value={saveName}
-                onChange={setSaveName}
-              >
-                <Label>名称</Label>
-                <Input placeholder="给这次保存起个名字" onKeyDown={(e) => e.key === "Enter" && handleSaveConfirm()} />
-              </TextField>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">取消</Button>
-              <Button slot="close" onPress={handleSaveConfirm} isDisabled={!saveName.trim()}>保存</Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <SaveModal
+        isOpen={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
+        title={currentName ? "另存为" : "保存代码"}
+        name={saveName}
+        onNameChange={setSaveName}
+        onSave={handleSaveConfirm}
+        placeholder="给这次保存起个名字"
+      />
 
-      {/* 加载 Modal */}
-      <Modal.Backdrop isOpen={loadModalOpen} onOpenChange={setLoadModalOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-md">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Icon className="bg-accent-soft text-accent">
-                <FolderOpen className="size-5" />
-              </Modal.Icon>
-              <Modal.Heading>加载已保存的代码</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {savedItems.length === 0 ? (
-                <p className="text-sm text-muted text-center py-8">暂无保存的代码</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {savedItems.map((item) => (
-                    <div
-                      key={item.name}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{item.name}</div>
-                        <div className="text-xs text-muted">
-                          {new Date(item.savedAt).toLocaleString()}
-                        </div>
-                      </div>
-                      <Tooltip delay={0}>
-                        <Button size="sm" variant="secondary" onPress={() => handleLoad(item)}>
-                          加载
-                        </Button>
-                        <Tooltip.Content>加载此代码</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip delay={0}>
-                        <Button isIconOnly size="sm" variant="ghost" onPress={() => handleDelete(item)}>
-                          <Trash2 size={14} className="text-danger" />
-                        </Button>
-                        <Tooltip.Content>删除</Tooltip.Content>
-                      </Tooltip>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      <LoadModal
+        isOpen={loadModalOpen}
+        onOpenChange={setLoadModalOpen}
+        title="加载已保存的代码"
+        items={savedItems}
+        onLoad={handleLoad}
+        onDelete={handleDelete}
+        emptyText="暂无保存的代码"
+      />
     </div>
   );
 }
