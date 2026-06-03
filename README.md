@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# orange-utils - 开发者工具箱
 
-## Getting Started
+一套实用的开发者工具集合，基于 Next.js 构建。
 
-First, run the development server:
+## 功能工具
+
+- **HTML 选择器** - 可视化选择 HTML 元素
+- **API 请求** - 发送 HTTP 请求，支持模板变量
+- **代码对比** - 对比两份代码，高亮差异
+- **正则测试** - 实时测试正则表达式
+- **资源管理** - 统一管理所有工具保存的数据
+
+## 开发
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 安装依赖
+bun install
+
+# 启动开发服务器
+bun run dev
+
+# 构建
+bun run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 部署
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 使用 PM2
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# 构建项目
+bun run build
 
-## Learn More
+# 启动 PM2
+bun run pm2:start
 
-To learn more about Next.js, take a look at the following resources:
+# 常用命令
+bun run pm2:stop      # 停止
+bun run pm2:restart   # 重启
+bun run pm2:logs      # 查看日志
+bun run pm2:status    # 查看状态
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 手动启动
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# 构建
+bun run build
 
-## Deploy on Vercel
+# 启动生产服务器
+bun run start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 技术栈
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- HeroUI v3
+- Tailwind CSS v4
+- CodeMirror 6
+
+## 项目结构
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── layout.tsx         # 主布局
+│   ├── page.tsx           # 首页（重定向）
+│   └── tools/             # 工具页面
+├── components/            # 共享组件
+├── tools/                 # 工具组件
+│   ├── html-selector/
+│   ├── api-request/
+│   ├── code-compare/
+│   ├── regex-tester/
+│   └── resource-manager/
+└── utils/                 # 工具函数
+```
+
+## 环境变量
+
+无需配置环境变量，所有数据存储在浏览器 IndexedDB 中。
+
+## 许可证
+
+MIT

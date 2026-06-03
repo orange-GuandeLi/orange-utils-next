@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pm2:start": "pm2 start pm2.config.js",
+    "pm2:stop": "pm2 stop orange-utils",
+    "pm2:restart": "pm2 restart orange-utils",
+    "pm2:logs": "pm2 logs orange-utils",
+    "pm2:status": "pm2 status orange-utils"
   },
   "dependencies": {
     "@codemirror/lang-html": "^6.4.11",

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button, Tooltip } from "@heroui/react";
 import {
   Code2,
-  Wrench,
   PanelLeftClose,
   PanelLeft,
   Send,
@@ -12,6 +11,7 @@ import {
   GitCompareArrows,
   Regex,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -70,7 +70,7 @@ export function Sidebar() {
       <div className="h-14 border-b border-separator flex items-center px-3">
         {!collapsed && (
           <div className="flex items-center gap-2 flex-1">
-            <Wrench size={18} className="text-accent" />
+            <Image src="/logo-processed.png" alt="orange-utils" width={28} height={28} />
             <span className="text-sm font-semibold">orange-utils</span>
           </div>
         )}

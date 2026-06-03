@@ -15,9 +15,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "orange-utils - 开发者工具箱",
-  description:
-    "一套实用的开发者工具集合：HTML Selector、API Request、资源管理、代码对比等",
-  keywords: ["developer tools", "html selector", "api request", "code compare"],
+  description: "一套实用的开发者工具集合：HTML 选择器、API 请求、代码对比、正则测试等",
+  icons: {
+    icon: "/logo-processed.png",
+    shortcut: "/logo-processed.png",
+    apple: "/logo-processed.png",
+  },
 };
 
 export default function RootLayout({

@@ -227,23 +227,6 @@ export function useIframeSelector({
 
       // 更新面包屑
       renderBreadcrumbRef.current(els.breadcrumb, info.domPath, iframe);
-
-      console.group(
-        "%c[HTML Selector] Element Selected",
-        "color:#22c55e;font-weight:bold",
-      );
-      console.log("Selector:", info.selector);
-      console.log("Tag:", info.tagName);
-      console.log("ID:", info.id || "(none)");
-      console.log("Class:", info.className || "(none)");
-      console.log("Size:", `${info.rect.width} x ${info.rect.height}`);
-      console.log("Position:", `top=${info.rect.top}, left=${info.rect.left}`);
-      if (info.editableType) {
-        console.log("Editable:", info.editableType, "->", info.editableValue);
-      }
-      console.log("Text:", info.textContent);
-      console.log("outerHTML:", info.outerHTML);
-      console.groupEnd();
     },
     [onSelected],
   );
