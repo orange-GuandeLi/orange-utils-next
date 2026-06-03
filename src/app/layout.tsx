@@ -14,12 +14,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "orange-utils - 开发者工具箱",
-  description: "一套实用的开发者工具集合：HTML 选择器、API 请求、代码对比、正则测试等",
+  title: {
+    default: "orange-utils - 在线开发者工具箱",
+    template: "%s | orange-utils",
+  },
+  description:
+    "免费在线开发者工具箱：HTML 可视化选择器、API 请求测试、代码对比、正则表达式测试、Markdown 编辑器。纯浏览器端运行，无需安装，数据不上传。",
+  keywords: [
+    "开发者工具",
+    "在线工具",
+    "HTML 选择器",
+    "API 测试",
+    "代码对比",
+    "正则测试",
+    "Markdown 编辑器",
+    "前端工具",
+    "developer tools",
+  ],
   icons: {
     icon: "/logo-processed.png",
     shortcut: "/logo-processed.png",
     apple: "/logo-processed.png",
+  },
+  openGraph: {
+    title: "orange-utils - 在线开发者工具箱",
+    description:
+      "免费在线开发者工具箱：HTML 选择器、API 请求、代码对比、正则测试、Markdown 编辑器。纯浏览器端运行，数据不上传。",
+    siteName: "orange-utils",
+    type: "website",
+    locale: "zh_CN",
   },
 };
 
