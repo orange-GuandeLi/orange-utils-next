@@ -10,6 +10,7 @@ import {
   Database,
   GitCompareArrows,
   Regex,
+  FileCode,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,6 +44,13 @@ const TOOLS = [
     description: "实时测试正则表达式",
     icon: Regex,
     href: "/tools/regex-tester",
+  },
+  {
+    id: "notes",
+    name: "Markdown",
+    description: "富文本 Markdown 编辑器",
+    icon: FileCode,
+    href: "/tools/markdown",
   },
 ];
 

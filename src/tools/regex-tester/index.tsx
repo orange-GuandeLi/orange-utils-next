@@ -43,7 +43,12 @@ export function RegexTester() {
     setSavedItems(items);
   }, []);
 
-  useEffect(() => { if (loadModalOpen) loadSavedList(); }, [loadModalOpen, loadSavedList]);
+  useEffect(() => {
+    if (loadModalOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadSavedList();
+    }
+  }, [loadModalOpen, loadSavedList]);
 
   // 保存
   const handleSave = async () => {

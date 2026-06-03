@@ -28,7 +28,10 @@ export function CodeCompare() {
   }, []);
 
   useEffect(() => {
-    if (loadTarget) loadSavedKeys();
+    if (loadTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadSavedKeys();
+    }
   }, [loadTarget, loadSavedKeys]);
 
   const handleLoadFromDB = async (key: string) => {

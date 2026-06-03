@@ -1,0 +1,12 @@
+{
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": [
+    "src/components/tiptap-*/**",
+    "src/components/tiptap-templates/**",
+    "src/hooks/**",
+    "src/lib/**",
+    "src/scss.d.ts",
+    "src/styles/**",
+    "src/tools/html-selector/hooks/**"
+  ]
+}

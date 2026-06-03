@@ -60,15 +60,18 @@ export function ResourceManager() {
       const isHtml = key.startsWith("html-selector:");
       const isApi = key.startsWith("api-request:");
       const isRegex = key.startsWith("regex:");
+      const isNotes = key.startsWith("notes:");
 
       items.push({
         _key: key,
         name: (item.name as string) || key.replace(/^.*?:saved:/, ""),
         content: isHtml
           ? ((item as { html?: string }).html || "")
-          : JSON.stringify(item, null, 2),
+          : isNotes
+            ? ((item as { content?: string }).content || "")
+            : JSON.stringify(item, null, 2),
         source: isManual ? "manual" : "tool",
-        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : isRegex ? "正则测试" : undefined,
+        toolName: isHtml ? "HTML 选择器" : isApi ? "API 请求" : isRegex ? "正则测试" : isNotes ? "Markdown" : undefined,
         savedAt: (item.savedAt as number) || 0,
         method: isApi ? (item.method as string) : undefined,
         url: isApi ? (item.url as string) : undefined,
@@ -79,7 +82,10 @@ export function ResourceManager() {
     setAllItems(items);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAll();
+  }, [loadAll]);
 
   // 筛选
   const filteredItems = allItems.filter((item) => {
@@ -276,7 +282,11 @@ export function ResourceManager() {
                   {item.source === "tool" && (
                     <Tooltip delay={0}>
                       <Button isIconOnly size="sm" variant="ghost" onPress={() => {
-                        const toolId = item._key.startsWith("html-selector:") ? "html-selector" : "api-request";
+                        let toolId = "api-request";
+                        if (item._key.startsWith("html-selector:")) toolId = "html-selector";
+                        else if (item._key.startsWith("api-request:")) toolId = "api-request";
+                        else if (item._key.startsWith("regex:")) toolId = "regex-tester";
+                        else if (item._key.startsWith("notes:")) toolId = "markdown";
                         window.location.href = `/tools/${toolId}`;
                       }}>
                         <ExternalLink size={14} />

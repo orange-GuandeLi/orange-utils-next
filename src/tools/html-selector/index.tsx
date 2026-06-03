@@ -122,7 +122,10 @@ export function HtmlSelector() {
   }, []);
 
   useEffect(() => {
-    if (loadModalOpen) loadSavedList();
+    if (loadModalOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadSavedList();
+    }
   }, [loadModalOpen, loadSavedList]);
 
   // 保存

@@ -41,7 +41,12 @@ export function ApiRequest() {
     setSavedItems(items);
   }, []);
 
-  useEffect(() => { if (loadModalOpen) loadSavedList(); }, [loadModalOpen, loadSavedList]);
+  useEffect(() => {
+    if (loadModalOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadSavedList();
+    }
+  }, [loadModalOpen, loadSavedList]);
 
   const loadAvailableVars = useCallback(async () => {
     const keys = await kvKeys();
@@ -55,7 +60,12 @@ export function ApiRequest() {
     setAvailableVars(vars);
   }, []);
 
-  useEffect(() => { if (varModalOpen) loadAvailableVars(); }, [varModalOpen, loadAvailableVars]);
+  useEffect(() => {
+    if (varModalOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadAvailableVars();
+    }
+  }, [varModalOpen, loadAvailableVars]);
 
   const resolveVars = useCallback(async (text: string): Promise<string> => {
     const pattern = /\{\{([^}]+)\}\}/g;

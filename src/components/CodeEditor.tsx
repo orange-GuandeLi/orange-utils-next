@@ -30,6 +30,7 @@ export function CodeEditor({ value, onChange, language = "html", readOnly = fals
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  // eslint-disable-next-line react-hooks/refs
   onChangeRef.current = onChange;
 
   useEffect(() => {

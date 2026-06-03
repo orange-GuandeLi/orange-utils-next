@@ -48,7 +48,9 @@ export function DiffView({
   const mergeViewRef = useRef<MergeView | null>(null);
   const onLeftChangeRef = useRef(onLeftChange);
   const onRightChangeRef = useRef(onRightChange);
+  // eslint-disable-next-line react-hooks/refs
   onLeftChangeRef.current = onLeftChange;
+  // eslint-disable-next-line react-hooks/refs
   onRightChangeRef.current = onRightChange;
 
   useEffect(() => {
