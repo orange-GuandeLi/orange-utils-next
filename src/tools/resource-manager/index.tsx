@@ -457,6 +457,7 @@ export function ResourceManager() {
                             isIconOnly
                             size="sm"
                             variant="ghost"
+                            aria-label="查看"
                             onPress={() => {
                               setDetailItem(item);
                               setDetailOpen(true);
@@ -472,6 +473,7 @@ export function ResourceManager() {
                               isIconOnly
                               size="sm"
                               variant="ghost"
+                              aria-label="打开工具"
                               onPress={() => {
                                 const url = item.name
                                   ? `${category.href}?load=${encodeURIComponent(item.name)}`
@@ -489,6 +491,7 @@ export function ResourceManager() {
                             isIconOnly
                             size="sm"
                             variant="ghost"
+                            aria-label="删除"
                             onPress={() => handleDelete(item._key)}
                           >
                             <Trash2 size={14} className="text-danger" />

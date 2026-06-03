@@ -44,7 +44,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
         {value || "-"}
       </span>
       <Tooltip delay={0}>
-        <Button isIconOnly size="sm" variant="ghost" className="shrink-0" onPress={handleCopy}>
+        <Button isIconOnly size="sm" variant="ghost" className="shrink-0" aria-label="复制" onPress={handleCopy}>
           {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
         </Button>
         <Tooltip.Content>{copied ? "已复制" : "复制"}</Tooltip.Content>
@@ -275,7 +275,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
         )}
         {selectedInfo && selectMode && (
           <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" onPress={() => setModalOpen(true)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="查看选中信息" onPress={() => setModalOpen(true)}>
               <Eye size={14} />
             </Button>
             <Tooltip.Content>查看选中信息</Tooltip.Content>

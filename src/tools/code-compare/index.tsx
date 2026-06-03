@@ -128,6 +128,7 @@ export function CodeCompare() {
                 isIconOnly
                 size="sm"
                 variant="ghost"
+                aria-label="关闭"
                 onPress={() => setLoadTarget(null)}
               >
                 <X size={14} />

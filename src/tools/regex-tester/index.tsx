@@ -318,7 +318,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
             ))}
           </div>
           <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" onPress={copyPattern}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="复制正则" onPress={copyPattern}>
               {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
             </Button>
             <Tooltip.Content>{copied ? "已复制" : "复制正则"}</Tooltip.Content>

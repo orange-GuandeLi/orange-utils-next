@@ -88,6 +88,7 @@ export function Sidebar() {
               isIconOnly
               size="sm"
               variant="ghost"
+              aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
               onPress={() => setCollapsed(!collapsed)}
             >
               {collapsed ? (

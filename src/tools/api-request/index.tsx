@@ -266,7 +266,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                   <Input className="flex-1" placeholder="键" value={h.key} onChange={(e) => updateHeader(i, "key", (e.target as HTMLInputElement).value)} />
                   <Input className="flex-1" placeholder="值" value={h.value} onChange={(e) => updateHeader(i, "value", (e.target as HTMLInputElement).value)} />
                   <Tooltip delay={0}>
-                    <Button isIconOnly size="sm" variant="ghost" onPress={() => removeHeader(i)}><X size={12} /></Button>
+                    <Button isIconOnly size="sm" variant="ghost" aria-label="删除请求头" onPress={() => removeHeader(i)}><X size={12} /></Button>
                     <Tooltip.Content>删除</Tooltip.Content>
                   </Tooltip>
                 </div>
@@ -289,7 +289,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                 </Chip>
                 <Chip size="sm" variant="soft" color="default"><Chip.Label>{response.time}ms</Chip.Label></Chip>
                 <Tooltip delay={0}>
-                  <Button isIconOnly size="sm" variant="ghost" onPress={handleCopyResponse}>
+                  <Button isIconOnly size="sm" variant="ghost" aria-label="复制响应" onPress={handleCopyResponse}>
                     {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
                   </Button>
                   <Tooltip.Content>{copied ? "已复制" : "复制响应"}</Tooltip.Content>

@@ -58,8 +58,9 @@ export function LoadModal<T extends LoadModalItem>({
                     <Tooltip.Trigger className="flex flex-col">
                       <Button
                         isIconOnly
-                        size="sm"
-                        variant="ghost"
+                          size="sm"
+                          variant="ghost"
+                          aria-label="删除"
                         onPress={() => onDelete(item)}
                       >
                         <Trash2 size={14} className="text-danger" />

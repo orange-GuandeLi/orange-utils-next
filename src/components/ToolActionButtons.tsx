@@ -40,7 +40,7 @@ export function ToolActionButtons({
       )}
       <Tooltip delay={0}>
         <Tooltip.Trigger className="flex flex-col">
-          <Button isIconOnly size="sm" variant="ghost" onPress={onSave}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="保存" onPress={onSave}>
             <Save size={14} />
           </Button>
         </Tooltip.Trigger>
@@ -49,7 +49,7 @@ export function ToolActionButtons({
       {currentName && (
         <Tooltip delay={0}>
           <Tooltip.Trigger className="flex flex-col">
-            <Button isIconOnly size="sm" variant="ghost" onPress={onSaveAs}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="另存为" onPress={onSaveAs}>
               <FileDown size={14} />
             </Button>
           </Tooltip.Trigger>
@@ -58,7 +58,7 @@ export function ToolActionButtons({
       )}
       <Tooltip delay={0}>
         <Tooltip.Trigger className="flex flex-col">
-          <Button isIconOnly size="sm" variant="ghost" onPress={onLoad}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="加载" onPress={onLoad}>
             <FolderOpen size={14} />
           </Button>
         </Tooltip.Trigger>
