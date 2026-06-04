@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { Button, Chip, ListBox, Select, Tooltip } from "@heroui/react"
-import { FolderOpen, GitCompareArrows } from "lucide-react"
+import { Button, Chip, ListBox, Select, Separator, Toolbar, Tooltip } from "@heroui/react"
+import { ArrowLeftRight, FolderOpen, GitCompareArrows } from "lucide-react"
 import { DiffView } from "./DiffView"
 import { kvGet, kvKeys } from "@/utils/db"
 import { LoadModal } from "@/components/LoadModal"
@@ -80,6 +80,11 @@ export function CodeCompare() {
   const leftLines = leftCode.split("\n").length
   const rightLines = rightCode.split("\n").length
 
+  const handleSwap = () => {
+    setLeftCode(rightCode)
+    setRightCode(leftCode)
+  }
+
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
       <ToolHeader
@@ -87,11 +92,11 @@ export function CodeCompare() {
         title="代码对比"
         subtitle="粘贴两份代码，高亮差异"
         extra={
-          <>
+          <Toolbar aria-label="对比选项" className="gap-1 bg-transparent p-0">
             <Select
               className="w-24"
-              selectedKey={language}
-              onSelectionChange={(key) => {
+              value={language}
+              onChange={(key) => {
                 if (key) setLanguage(key as (typeof LANGUAGES)[number]["id"])
               }}
             >
@@ -111,41 +116,52 @@ export function CodeCompare() {
               </Select.Popover>
             </Select>
 
+            <Separator orientation="vertical" className="mx-1 h-5" />
+
             <Tooltip delay={0}>
-              <Tooltip.Trigger className="flex flex-col">
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  aria-label="加载 A"
-                  onPress={() => openLoad("left")}
-                >
-                  <FolderOpen size={14} />
-                </Button>
-              </Tooltip.Trigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="加载 A"
+                onPress={() => openLoad("left")}
+              >
+                <FolderOpen size={14} />
+              </Button>
               <Tooltip.Content>加载到左侧 (A)</Tooltip.Content>
             </Tooltip>
             <Tooltip delay={0}>
-              <Tooltip.Trigger className="flex flex-col">
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  aria-label="加载 B"
-                  onPress={() => openLoad("right")}
-                >
-                  <FolderOpen size={14} />
-                </Button>
-              </Tooltip.Trigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="加载 B"
+                onPress={() => openLoad("right")}
+              >
+                <FolderOpen size={14} />
+              </Button>
               <Tooltip.Content>加载到右侧 (B)</Tooltip.Content>
             </Tooltip>
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="交换 A/B"
+                isDisabled={!leftCode && !rightCode}
+                onPress={handleSwap}
+              >
+                <ArrowLeftRight size={14} />
+              </Button>
+              <Tooltip.Content>交换 A/B</Tooltip.Content>
+            </Tooltip>
+
+            <Separator orientation="vertical" className="mx-1 h-5" />
 
             <Chip size="sm" variant="soft" color="default">
-              <Chip.Label>
-                {leftLines} 行 vs {rightLines} 行
-              </Chip.Label>
+              {leftLines} 行 vs {rightLines} 行
             </Chip>
-          </>
+          </Toolbar>
         }
       />
 
@@ -170,7 +186,7 @@ export function CodeCompare() {
         emptyText="暂无保存的资源"
         renderMetaAction={(item) => (
           <Chip size="sm" variant="soft" color="default">
-            <Chip.Label className="text-xs">{item.toolName}</Chip.Label>
+            {item.toolName}
           </Chip>
         )}
       />

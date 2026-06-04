@@ -1,7 +1,18 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button, Chip, Input, Label, TextField, Tooltip, toast } from "@heroui/react"
+import {
+  Button,
+  Chip,
+  Input,
+  Label,
+  SearchField,
+  Spinner,
+  TextField,
+  Toolbar,
+  Tooltip,
+  toast,
+} from "@heroui/react"
 import {
   Clock,
   Code2,
@@ -63,6 +74,7 @@ export function ResourceManager() {
     keys: string[]
     raw: Record<string, unknown>
   } | null>(null)
+  const [busy, setBusy] = useState<null | "export" | "import" | "create">(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const categories: ToolDef[] = RESOURCE_CATEGORIES
@@ -127,35 +139,45 @@ export function ResourceManager() {
   const handleCreate = async () => {
     if (!newName.trim() || !newContent.trim()) return
     const name = newName.trim()
-    await kvSet(`manual:saved:${name}`, {
-      name,
-      content: newContent,
-      savedAt: Date.now(),
-    })
-    setCreateModalOpen(false)
-    setNewName("")
-    setNewContent("")
-    void loadAll()
-    toast.success(`已创建「${name}」`)
+    setBusy("create")
+    try {
+      await kvSet(`manual:saved:${name}`, {
+        name,
+        content: newContent,
+        savedAt: Date.now(),
+      })
+      setCreateModalOpen(false)
+      setNewName("")
+      setNewContent("")
+      void loadAll()
+      toast.success(`已创建「${name}」`)
+    } finally {
+      setBusy(null)
+    }
   }
 
   const handleExport = async () => {
-    const keys = await kvKeys()
-    const data: Record<string, unknown> = {}
-    for (const key of keys) {
-      if (key.includes(":saved:")) {
-        const value = await kvGet(key)
-        if (value !== undefined) data[key] = value
+    setBusy("export")
+    try {
+      const keys = await kvKeys()
+      const data: Record<string, unknown> = {}
+      for (const key of keys) {
+        if (key.includes(":saved:")) {
+          const value = await kvGet(key)
+          if (value !== undefined) data[key] = value
+        }
       }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `orange-utils-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success("已导出备份文件")
+    } finally {
+      setBusy(null)
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `orange-utils-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("已导出备份文件")
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,26 +200,31 @@ export function ResourceManager() {
 
   const handleImportConfirm = async (mode: "merge" | "overwrite") => {
     if (!importPreview) return
-    if (mode === "overwrite") {
-      const keys = await kvKeys()
-      for (const key of keys) {
-        if (key.includes(":saved:")) await kvDelete(key)
-      }
-    }
-    for (const [key, value] of Object.entries(importPreview.raw)) {
-      if (key.includes(":saved:")) {
-        if (mode === "merge") {
-          const existing = await kvGet(key)
-          if (existing === undefined) await kvSet(key, value)
-        } else {
-          await kvSet(key, value)
+    setBusy("import")
+    try {
+      if (mode === "overwrite") {
+        const keys = await kvKeys()
+        for (const key of keys) {
+          if (key.includes(":saved:")) await kvDelete(key)
         }
       }
+      for (const [key, value] of Object.entries(importPreview.raw)) {
+        if (key.includes(":saved:")) {
+          if (mode === "merge") {
+            const existing = await kvGet(key)
+            if (existing === undefined) await kvSet(key, value)
+          } else {
+            await kvSet(key, value)
+          }
+        }
+      }
+      setImportModalOpen(false)
+      setImportPreview(null)
+      void loadAll()
+      toast.success(mode === "overwrite" ? "已覆盖导入" : "已合并导入")
+    } finally {
+      setBusy(null)
     }
-    setImportModalOpen(false)
-    setImportPreview(null)
-    void loadAll()
-    toast.success(mode === "overwrite" ? "已覆盖导入" : "已合并导入")
   }
 
   return (
@@ -208,65 +235,82 @@ export function ResourceManager() {
         <span className="text-[11px] text-muted hidden sm:inline">数据存储在浏览器本地</span>
         <div className="flex-1" />
         <Chip size="sm" variant="soft" color="default">
-          <Chip.Label>{allItems.length} 条</Chip.Label>
+          {allItems.length} 条
         </Chip>
-        <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
-          <Plus size={14} />
-          <span className="text-xs">新建</span>
-        </Button>
-        <Button size="sm" variant="ghost" onPress={handleExport}>
-          <Download size={14} />
-          <span className="text-xs">导出</span>
-        </Button>
-        <Button size="sm" variant="ghost" onPress={() => fileInputRef.current?.click()}>
-          <Upload size={14} />
-          <span className="text-xs">导入</span>
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        <Toolbar aria-label="资源操作" className="gap-1 bg-transparent p-0">
+          <Button size="sm" variant="ghost" onPress={() => setCreateModalOpen(true)}>
+            <Plus size={14} />
+            <span className="text-xs">新建</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            isPending={busy === "export"}
+            onPress={() => void handleExport()}
+          >
+            {({ isPending }) => (
+              <>
+                {isPending ? <Spinner color="current" size="sm" /> : <Download size={14} />}
+                <span className="text-xs">导出</span>
+              </>
+            )}
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => fileInputRef.current?.click()}>
+            <Upload size={14} />
+            <span className="text-xs">导入</span>
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+        </Toolbar>
       </header>
 
       <div className="flex-1 flex min-h-0">
         <aside className="w-48 border-r border-separator bg-surface flex flex-col shrink-0">
           <div className="p-3 space-y-0.5 flex-1 overflow-y-auto">
-            <button
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+            <Button
+              fullWidth
+              size="sm"
+              variant="tertiary"
+              className={`justify-start gap-2.5 px-3 py-2 h-auto text-xs ${
                 activeCategory === "all"
                   ? "bg-secondary text-secondary-foreground"
-                  : "hover:bg-surface-secondary text-muted"
+                  : "text-muted hover:bg-surface-secondary"
               }`}
-              onClick={() => setActiveCategory("all")}
+              onPress={() => setActiveCategory("all")}
             >
               <FolderOpen size={14} className={activeCategory === "all" ? "text-accent" : ""} />
               <span className="flex-1 text-left">全部资源</span>
               <span className="text-[10px] text-muted tabular-nums">{allItems.length}</span>
-            </button>
+            </Button>
 
             <div className="h-px bg-separator my-2" />
 
             {categoryCounts.map((cat) => {
               const Icon = iconFor(cat.id)
               return (
-                <button
+                <Button
                   key={cat.id}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+                  fullWidth
+                  size="sm"
+                  variant="tertiary"
+                  className={`justify-start gap-2.5 px-3 py-2 h-auto text-xs ${
                     activeCategory === cat.id
                       ? "bg-secondary text-secondary-foreground"
-                      : "hover:bg-surface-secondary text-muted"
+                      : "text-muted hover:bg-surface-secondary"
                   }`}
-                  onClick={() => setActiveCategory(cat.id)}
+                  onPress={() => setActiveCategory(cat.id)}
                 >
                   <Icon size={14} className={activeCategory === cat.id ? "text-accent" : ""} />
                   <span className="flex-1 text-left truncate">{cat.name}</span>
                   {cat.count > 0 && (
                     <span className="text-[10px] text-muted tabular-nums">{cat.count}</span>
                   )}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -274,16 +318,22 @@ export function ResourceManager() {
 
         <div className="flex-1 flex flex-col min-w-0">
           <div className="px-4 py-3 border-b border-separator flex items-center gap-3">
-            <Input
+            <SearchField
               className="w-64"
-              placeholder="搜索资源..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+              onChange={setSearchQuery}
+              variant="secondary"
+            >
+              <SearchField.Group>
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder="搜索资源..." />
+                <SearchField.ClearButton />
+              </SearchField.Group>
+            </SearchField>
             <div className="flex-1" />
             {activeCategory !== "all" && (
               <Chip size="sm" variant="soft" color="default">
-                <Chip.Label>{categories.find((c) => c.id === activeCategory)?.name}</Chip.Label>
+                {categories.find((c) => c.id === activeCategory)?.name}
               </Chip>
             )}
           </div>
@@ -325,7 +375,7 @@ export function ResourceManager() {
                           <span className="text-sm font-medium truncate">{item.name}</span>
                           {item.method && (
                             <Chip size="sm" variant="soft" color="accent">
-                              <Chip.Label className="font-mono text-xs">{item.method}</Chip.Label>
+                              <span className="font-mono text-xs">{item.method}</span>
                             </Chip>
                           )}
                         </div>
@@ -402,7 +452,7 @@ export function ResourceManager() {
         onOpenChangeAction={setDetailOpen}
         title={detailItem?.name || "资源详情"}
         icon={Eye}
-        width="sm:max-w-2xl"
+        size="lg"
       >
         <div className="h-80 min-h-0">
           <CodeEditor value={detailItem?.content || ""} language="html" readOnly />
@@ -430,7 +480,7 @@ export function ResourceManager() {
         onOpenChangeAction={setCreateModalOpen}
         title="新建资源"
         icon={Plus}
-        width="sm:max-w-2xl"
+        size="lg"
       >
         <div className="space-y-4">
           <TextField value={newName} onChange={setNewName}>
@@ -449,10 +499,11 @@ export function ResourceManager() {
             取消
           </Button>
           <Button
-            onPress={() => void handleCreate()}
+            isPending={busy === "create"}
             isDisabled={!newName.trim() || !newContent.trim()}
+            onPress={() => void handleCreate()}
           >
-            创建
+            {({ isPending }) => <>{isPending ? "创建中…" : "创建"}</>}
           </Button>
         </div>
       </ModalShell>
@@ -462,7 +513,7 @@ export function ResourceManager() {
         onOpenChangeAction={setImportModalOpen}
         title="导入资源"
         icon={Upload}
-        width="sm:max-w-md"
+        size="md"
       >
         {importPreview && (
           <div className="space-y-3">
@@ -483,10 +534,19 @@ export function ResourceManager() {
           <Button variant="secondary" onPress={() => setImportModalOpen(false)}>
             取消
           </Button>
-          <Button variant="ghost" onPress={() => void handleImportConfirm("merge")}>
-            合并
+          <Button
+            variant="ghost"
+            isPending={busy === "import"}
+            onPress={() => void handleImportConfirm("merge")}
+          >
+            {({ isPending }) => <>{isPending ? "合并中…" : "合并"}</>}
           </Button>
-          <Button onPress={() => void handleImportConfirm("overwrite")}>覆盖</Button>
+          <Button
+            isPending={busy === "import"}
+            onPress={() => void handleImportConfirm("overwrite")}
+          >
+            {({ isPending }) => <>{isPending ? "覆盖中…" : "覆盖"}</>}
+          </Button>
         </div>
       </ModalShell>
     </div>

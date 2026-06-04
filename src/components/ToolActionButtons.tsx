@@ -30,12 +30,12 @@ export function ToolActionButtons({
     <>
       {currentName && (
         <Chip size="sm" variant="soft" color="default">
-          <Chip.Label>{currentName}</Chip.Label>
+          {currentName}
         </Chip>
       )}
       {dirty && (
         <Chip size="sm" variant="soft" color="warning">
-          <Chip.Label>未保存</Chip.Label>
+          未保存
         </Chip>
       )}
       <Tooltip delay={0}>

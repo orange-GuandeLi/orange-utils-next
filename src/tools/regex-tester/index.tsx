@@ -1,7 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Chip, Input, Tooltip, toast } from "@heroui/react"
+import {
+  Button,
+  Chip,
+  Input,
+  Separator,
+  ToggleButton,
+  ToggleButtonGroup,
+  Toolbar,
+  Tooltip,
+  toast,
+} from "@heroui/react"
 import { Check, Copy, Plus, Regex } from "lucide-react"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
 import { LoadModal } from "@/components/LoadModal"
@@ -160,13 +170,13 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
     return parts
   }, [matches, testString])
 
-  const toggleFlag = (flag: FlagId) => {
-    setFlags((prev) => {
-      const next = new Set(prev)
-      if (next.has(flag)) next.delete(flag)
-      else next.add(flag)
-      return next
-    })
+  const handleFlagsChange = (keys: Set<unknown>) => {
+    // 过滤为合法 FlagId；至少保留一个全局匹配
+    const filtered = new Set<FlagId>(
+      [...keys].filter((k): k is FlagId => FLAG_OPTIONS.some((f) => f.id === (k as FlagId))),
+    )
+    const next = filtered.size === 0 ? new Set<FlagId>(["g"]) : filtered
+    setFlags(next)
     resource.setDirty(true)
   }
 
@@ -250,9 +260,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
         extra={
           <>
             <Chip size="sm" variant="soft" color={error ? "danger" : "success"}>
-              <Chip.Label className="text-xs">
-                {error ? "语法错误" : pattern ? `${matches.length} 个匹配` : "输入正则"}
-              </Chip.Label>
+              {error ? "语法错误" : pattern ? `${matches.length} 个匹配` : "输入正则"}
             </Chip>
             <ToolActionButtons
               currentName={resource.currentName}
@@ -278,44 +286,55 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
             }}
           />
           <span className="text-muted text-sm">/</span>
-          <div className="flex gap-1">
-            {FLAG_OPTIONS.map((f) => (
-              <Button
-                key={f.id}
-                size="sm"
-                variant={flags.has(f.id) ? "primary" : "ghost"}
-                className="w-8 h-8 min-w-0 p-0 font-mono text-xs"
-                onPress={() => toggleFlag(f.id)}
-              >
-                {f.name}
-              </Button>
-            ))}
-          </div>
-          <Tooltip delay={0}>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label="复制正则"
-              onPress={copyPattern}
+          <Toolbar aria-label="正则选项" className="gap-0 bg-transparent p-0">
+            <ToggleButtonGroup
+              aria-label="正则标志"
+              selectedKeys={flags}
+              selectionMode="multiple"
+              onSelectionChange={handleFlagsChange}
             >
-              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-            </Button>
-            <Tooltip.Content>{copied ? "已复制" : "复制正则"}</Tooltip.Content>
-          </Tooltip>
+              {FLAG_OPTIONS.map((f, i) => (
+                <ToggleButton
+                  key={f.id}
+                  id={f.id}
+                  aria-label={f.description}
+                  className="w-8 h-8 min-w-0 p-0 font-mono text-xs"
+                >
+                  {i > 0 && <ToggleButtonGroup.Separator />}
+                  {f.name}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Separator orientation="vertical" className="mx-1 h-5" />
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="复制正则"
+                onPress={copyPattern}
+              >
+                {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+              </Button>
+              <Tooltip.Content>{copied ? "已复制" : "复制正则"}</Tooltip.Content>
+            </Tooltip>
+          </Toolbar>
         </div>
         {error && <p className="text-xs text-danger mt-2 font-mono">{error}</p>}
       </div>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 border-r border-separator">
-          <div className="h-9 px-4 flex items-center border-b border-separator bg-surface shrink-0">
+          <div className="h-9 px-4 flex items-center gap-2 border-b border-separator bg-surface shrink-0">
             <span className="text-xs text-muted font-medium">测试文本</span>
             <div className="flex-1" />
-            <Button size="sm" variant="ghost" onPress={openVarModal}>
-              <Plus size={12} />
-              <span className="text-xs">插入变量</span>
-            </Button>
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" onPress={openVarModal}>
+                <Plus size={12} />
+                <span className="text-xs">插入变量</span>
+              </Button>
+              <Tooltip.Content>从其他工具保存的数据中插入</Tooltip.Content>
+            </Tooltip>
           </div>
           <div className="flex-1 relative">
             {highlightedText && (
@@ -364,7 +383,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <Chip size="sm" variant="soft" color="accent">
-                        <Chip.Label className="text-xs">#{i + 1}</Chip.Label>
+                        #{i + 1}
                       </Chip>
                       <span className="text-xs text-muted">
                         位置 {match.index}-{match.index + match.length}
@@ -437,7 +456,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <Chip size="sm" variant="soft" color="default">
-                      <Chip.Label className="text-xs">{v.toolName}</Chip.Label>
+                      {v.toolName}
                     </Chip>
                     <span className="text-sm font-medium truncate">{v.name}</span>
                   </div>

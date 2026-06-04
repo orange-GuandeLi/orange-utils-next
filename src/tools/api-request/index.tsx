@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Button, Chip, Input, ListBox, Select, Tabs, Tooltip, toast } from "@heroui/react"
+import { Button, Chip, Input, ListBox, Select, Spinner, Tabs, Tooltip, toast } from "@heroui/react"
 import { Check, Copy, Plus, Send, X } from "lucide-react"
 import { ToolHeader } from "@/components/ToolHeader"
 import { ToolActionButtons } from "@/components/ToolActionButtons"
@@ -259,8 +259,8 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
             <Select
               className="w-28"
               placeholder="GET"
-              selectedKey={method}
-              onSelectionChange={(key) => {
+              value={method}
+              onChange={(key) => {
                 if (key) {
                   setMethod(key as Method)
                   resource.setDirty(true)
@@ -295,11 +295,15 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
               size="sm"
               className="text-xs"
               variant="primary"
+              isPending={loading}
               onPress={handleSend}
-              isDisabled={loading}
             >
-              <Send size={14} />
-              {loading ? "发送中..." : "发送"}
+              {({ isPending }) => (
+                <>
+                  {isPending ? <Spinner color="current" size="sm" /> : <Send size={14} />}
+                  {isPending ? "发送中..." : "发送"}
+                </>
+              )}
             </Button>
           </div>
 
@@ -314,7 +318,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                   请求头
                   {headers.filter((h) => h.key.trim()).length > 0 && (
                     <Chip size="sm" variant="soft" color="default" className="ml-1">
-                      <Chip.Label>{headers.filter((h) => h.key.trim()).length}</Chip.Label>
+                      {headers.filter((h) => h.key.trim()).length}
                     </Chip>
                   )}
                   <Tabs.Indicator />
@@ -395,12 +399,10 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
             {response && (
               <div className="flex items-center gap-2">
                 <Chip size="sm" variant="soft" color={response.status < 400 ? "success" : "danger"}>
-                  <Chip.Label>
-                    {response.status} {response.statusText}
-                  </Chip.Label>
+                  {response.status} {response.statusText}
                 </Chip>
                 <Chip size="sm" variant="soft" color="default">
-                  <Chip.Label>{response.time}ms</Chip.Label>
+                  {response.time}ms
                 </Chip>
                 <Tooltip delay={0}>
                   <Button
@@ -476,7 +478,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <Chip size="sm" variant="soft" color="default">
-                      <Chip.Label className="text-xs">{v.toolName}</Chip.Label>
+                      {v.toolName}
                     </Chip>
                     <span className="text-sm font-medium truncate">{v.name}</span>
                   </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button, Chip, Tooltip, toast } from "@heroui/react"
+import { Button, Chip, Toolbar, Tooltip, toast } from "@heroui/react"
 import { Check, Code2, Copy, Eye, GripVertical, SquareDashedMousePointer } from "lucide-react"
 import { ToolHeader } from "@/components/ToolHeader"
 import { ToolActionButtons } from "@/components/ToolActionButtons"
@@ -105,6 +105,8 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
     setModalOpen(false)
   }, [])
 
+  const selectModeBtnRef = useRef<HTMLButtonElement>(null)
+
   useIframeSelector({
     iframeRef,
     selectMode,
@@ -198,51 +200,55 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
               onLoadAction={resource.openLoad}
             />
             <Chip size="sm" variant="soft" color="default" className="font-mono">
-              <Chip.Label>{previewPx}px</Chip.Label>
+              {previewPx}px
             </Chip>
           </>
         }
       />
 
       <div className="flex items-center gap-2 px-5 py-2 border-b border-separator shrink-0 justify-end">
-        <Button
-          size="sm"
-          className="text-xs"
-          variant={selectMode ? "danger" : "primary"}
-          onPress={(e) => {
-            ;(e.target as HTMLElement)?.blur?.()
-            if (selectMode) {
-              setSelectMode(false)
-              setSelectedInfo(null)
-              setModalOpen(false)
-            } else {
-              setSelectMode(true)
-              setSelectedInfo(null)
-            }
-          }}
-        >
-          <SquareDashedMousePointer size={14} />
-          {selectMode ? "退出选择 (ESC)" : "选择元素"}
-        </Button>
-        {selectMode && (
-          <Chip size="sm" variant="soft" color="default">
-            <Chip.Label>Shift 切父级 / Tab 切重叠</Chip.Label>
-          </Chip>
-        )}
-        {selectedInfo && selectMode && (
-          <Tooltip delay={0}>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label="查看选中信息"
-              onPress={() => setModalOpen(true)}
-            >
-              <Eye size={14} />
-            </Button>
-            <Tooltip.Content>查看选中信息</Tooltip.Content>
-          </Tooltip>
-        )}
+        <Toolbar aria-label="选择工具" className="gap-2 bg-transparent p-0">
+          <Button
+            ref={selectModeBtnRef}
+            size="sm"
+            className="text-xs"
+            variant={selectMode ? "danger" : "primary"}
+            onPress={() => {
+              // 按下后主动失焦，避免空格/回车重复触发
+              selectModeBtnRef.current?.blur()
+              if (selectMode) {
+                setSelectMode(false)
+                setSelectedInfo(null)
+                setModalOpen(false)
+              } else {
+                setSelectMode(true)
+                setSelectedInfo(null)
+              }
+            }}
+          >
+            <SquareDashedMousePointer size={14} />
+            {selectMode ? "退出选择 (ESC)" : "选择元素"}
+          </Button>
+          {selectMode && (
+            <Chip size="sm" variant="soft" color="default">
+              Shift 切父级 / Tab 切重叠
+            </Chip>
+          )}
+          {selectedInfo && selectMode && (
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="查看选中信息"
+                onPress={() => setModalOpen(true)}
+              >
+                <Eye size={14} />
+              </Button>
+              <Tooltip.Content>查看选中信息</Tooltip.Content>
+            </Tooltip>
+          )}
+        </Toolbar>
       </div>
 
       <div ref={setContainerRef} className="flex-1 flex min-h-0 relative select-none">
@@ -293,7 +299,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
             {selectMode && !selectedInfo && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
                 <Chip size="lg" variant="primary" color="danger" className="animate-pulse">
-                  <Chip.Label>点击页面中的元素进行选择</Chip.Label>
+                  点击页面中的元素进行选择
                 </Chip>
               </div>
             )}
@@ -307,7 +313,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
           onOpenChangeAction={setModalOpen}
           title="选中元素信息"
           icon={Eye}
-          width="sm:max-w-lg"
+          size="md"
         >
           <div className="divide-y divide-separator">
             <CopyField label="选择器" value={selectedInfo.selector} />

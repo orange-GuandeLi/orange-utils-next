@@ -21,7 +21,7 @@ function NavItem({
   const isActive = pathname === tool.href
   return (
     <Tooltip delay={0}>
-      <Tooltip.Trigger className="flex flex-col">
+      <Tooltip.Trigger>
         <Link
           href={tool.href!}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -29,6 +29,7 @@ function NavItem({
               ? "bg-secondary text-secondary-foreground"
               : "hover:bg-surface-secondary text-muted"
           } ${collapsed ? "justify-center" : ""}`}
+          aria-current={isActive ? "page" : undefined}
         >
           <Icon size={16} className={isActive ? "text-accent" : ""} />
           {!collapsed && <span className="truncate text-xs">{tool.name}</span>}
@@ -59,24 +60,22 @@ export function Sidebar() {
           </div>
         )}
         <Tooltip delay={0}>
-          <Tooltip.Trigger className="flex flex-col">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
-              onPress={() => setCollapsed(!collapsed)}
-            >
-              {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-            </Button>
-          </Tooltip.Trigger>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+            onPress={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+          </Button>
           <Tooltip.Content placement="right">
             {collapsed ? "展开侧边栏" : "收起侧边栏"}
           </Tooltip.Content>
         </Tooltip>
       </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto flex flex-col">
         {SIDEBAR_TOOLS.map((tool) => (
           <NavItem key={tool.id} tool={tool} pathname={pathname} collapsed={collapsed} />
         ))}
