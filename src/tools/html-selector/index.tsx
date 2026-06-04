@@ -1,5 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Input, Label, TextField, toast } from "@heroui/react";
+import {
+  Button,
+  Chip,
+  Tooltip,
+  Input,
+  Label,
+  TextField,
+  toast,
+} from "@heroui/react";
 import {
   SquareDashedMousePointer,
   Copy,
@@ -44,8 +52,19 @@ function CopyField({ label, value }: { label: string; value: string }) {
         {value || "-"}
       </span>
       <Tooltip delay={0}>
-        <Button isIconOnly size="sm" variant="ghost" className="shrink-0" aria-label="复制" onPress={handleCopy}>
-          {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          className="shrink-0"
+          aria-label="复制"
+          onPress={handleCopy}
+        >
+          {copied ? (
+            <Check size={12} className="text-success" />
+          ) : (
+            <Copy size={12} />
+          )}
         </Button>
         <Tooltip.Content>{copied ? "已复制" : "复制"}</Tooltip.Content>
       </Tooltip>
@@ -53,8 +72,18 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) {
+export function HtmlSelector({
+  initialLoadName,
+}: {
+  initialLoadName?: string;
+}) {
   const [html, setHtml] = useState(SAMPLE_HTML);
+  const [previewHtml, setPreviewHtml] = useState(SAMPLE_HTML);
+  const rafRef = useRef<number>(0);
+
+  // 组件卸载时取消未执行的 RAF
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
   const [selectMode, setSelectMode] = useState(false);
   const [selectedInfo, setSelectedInfo] = useState<SelectionInfo | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -82,16 +111,21 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
   }, [editorWidth]);
 
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
-    if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
-    if (node) {
-      (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-      const ro = new ResizeObserver(() => updatePreviewWidth());
-      ro.observe(node);
-      resizeObserverRef.current = ro;
-      updatePreviewWidth();
-    }
-  }, [updatePreviewWidth]);
+  const setContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
+      if (node) {
+        (
+          containerRef as React.MutableRefObject<HTMLDivElement | null>
+        ).current = node;
+        const ro = new ResizeObserver(() => updatePreviewWidth());
+        ro.observe(node);
+        resizeObserverRef.current = ro;
+        updatePreviewWidth();
+      }
+    },
+    [updatePreviewWidth],
+  );
 
   const handleSelected = useCallback((info: SelectionInfo) => {
     setSelectedInfo(info);
@@ -110,6 +144,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
       const item = await kvGet<SavedItem>(STORAGE_PREFIX + initialLoadName);
       if (item) {
         setHtml(item.html);
+        setPreviewHtml(item.html);
         setCurrentName(item.name);
         setDirty(false);
         setSelectMode(false);
@@ -180,6 +215,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
   // 加载
   const handleLoad = (item: SavedItem) => {
     setHtml(item.html);
+    setPreviewHtml(item.html);
     setCurrentName(item.name);
     setDirty(false);
     setSelectMode(false);
@@ -240,7 +276,12 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
               onSaveAs={handleSaveAs}
               onLoad={() => setLoadModalOpen(true)}
             />
-            <Chip size="sm" variant="soft" color="default" className="font-mono">
+            <Chip
+              size="sm"
+              variant="soft"
+              color="default"
+              className="font-mono"
+            >
               <Chip.Label>{previewPx}px</Chip.Label>
             </Chip>
           </>
@@ -248,7 +289,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
       />
 
       {/* Tool-specific controls */}
-      <div className="flex items-center gap-2 px-5 py-2 border-b border-separator shrink-0">
+      <div className="flex items-center gap-2 px-5 py-2 border-b border-separator shrink-0 justify-end">
         <Button
           size="sm"
           className="text-xs"
@@ -275,7 +316,13 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
         )}
         {selectedInfo && selectMode && (
           <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="查看选中信息" onPress={() => setModalOpen(true)}>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label="查看选中信息"
+              onPress={() => setModalOpen(true)}
+            >
               <Eye size={14} />
             </Button>
             <Tooltip.Content>查看选中信息</Tooltip.Content>
@@ -284,7 +331,10 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
       </div>
 
       {/* Main */}
-      <div ref={setContainerRef} className="flex-1 flex min-h-0 relative select-none">
+      <div
+        ref={setContainerRef}
+        className="flex-1 flex min-h-0 relative select-none"
+      >
         <div
           className="border-r border-separator flex flex-col shrink-0 overflow-hidden"
           style={{ width: `${editorWidth}%` }}
@@ -302,6 +352,11 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
                 setSelectMode(false);
                 setSelectedInfo(null);
                 setModalOpen(false);
+                // RAF 节流：预览跟随浏览器刷新率更新
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = requestAnimationFrame(() => {
+                  setPreviewHtml(v);
+                });
               }}
             />
           </div>
@@ -321,12 +376,17 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
             <iframe
               ref={iframeRef}
               sandbox="allow-scripts allow-same-origin"
-              srcDoc={html}
+              srcDoc={previewHtml}
               className="w-full h-full border-none"
             />
             {selectMode && !selectedInfo && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-                <Chip size="lg" variant="primary" color="danger" className="animate-pulse">
+                <Chip
+                  size="lg"
+                  variant="primary"
+                  color="danger"
+                  className="animate-pulse"
+                >
                   <Chip.Label>点击页面中的元素进行选择</Chip.Label>
                 </Chip>
               </div>
@@ -349,12 +409,21 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
             <CopyField label="标签" value={selectedInfo.tagName} />
             <CopyField label="ID" value={selectedInfo.id} />
             <CopyField label="类名" value={selectedInfo.className} />
-            <CopyField label="尺寸" value={`${selectedInfo.rect.width} × ${selectedInfo.rect.height}`} />
-            <CopyField label="位置" value={`top=${selectedInfo.rect.top}, left=${selectedInfo.rect.left}`} />
+            <CopyField
+              label="尺寸"
+              value={`${selectedInfo.rect.width} × ${selectedInfo.rect.height}`}
+            />
+            <CopyField
+              label="位置"
+              value={`top=${selectedInfo.rect.top}, left=${selectedInfo.rect.left}`}
+            />
             {selectedInfo.editableType && (
               <>
                 <CopyField label="可编辑" value={selectedInfo.editableType} />
-                <CopyField label="值" value={selectedInfo.editableValue || ""} />
+                <CopyField
+                  label="值"
+                  value={selectedInfo.editableValue || ""}
+                />
               </>
             )}
             <CopyField label="文本" value={selectedInfo.textContent} />
