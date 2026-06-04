@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "http://utils.orange-ai.site/sitemap.xml",
+    sitemap: "https://utils.orange-ai.site/sitemap.xml",
   };
 }

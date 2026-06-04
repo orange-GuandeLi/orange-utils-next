@@ -8,7 +8,7 @@ import { ToolActionButtons } from "@/components/ToolActionButtons"
 import { LoadModal } from "@/components/LoadModal"
 import { SaveModal } from "@/components/SaveModal"
 import { ModalShell } from "@/components/ModalShell"
-import { CodeEditor } from "./CodeEditor"
+import { CodeEditor } from "@/components/CodeEditor"
 import { useIframeSelector, type SelectionInfo } from "./hooks/useIframeSelector"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
 import { kvGet } from "@/utils/db"
@@ -292,6 +292,9 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
           <div className="flex-1 min-h-0 bg-surface relative">
             <iframe
               ref={iframeRef}
+              // SECURITY: allow-same-origin is required for useIframeSelector to access
+              // iframe.contentDocument. srcdoc iframes inherit parent origin, so this is
+              // safe as long as user HTML is only rendered via srcdoc (not postMessage).
               sandbox="allow-scripts allow-same-origin"
               srcDoc={previewHtml}
               className="w-full h-full border-none"

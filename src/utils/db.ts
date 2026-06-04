@@ -58,7 +58,27 @@ export async function kvDelete(key: string): Promise<void> {
     const req = store.delete(key)
     req.onsuccess = () => resolve()
     tx.onerror = () => reject(tx.error)
-    req.onerror = () => reject(req.error)
+  })
+}
+
+/** 一次性读取所有 kv 对（避免 N+1 查询） */
+export async function kvGetAll<T>(): Promise<Map<string, T>> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly")
+    const store = tx.objectStore(STORE_NAME)
+    const req = store.openCursor()
+    const result = new Map<string, T>()
+    req.onsuccess = () => {
+      const cursor = req.result
+      if (cursor) {
+        result.set(cursor.key as string, cursor.value as T)
+        cursor.continue()
+      } else {
+        resolve(result)
+      }
+    }
+    tx.onerror = () => reject(tx.error)
   })
 }
 

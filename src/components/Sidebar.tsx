@@ -81,7 +81,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-2 border-t border-separator space-y-1">
+      <div className="p-2 border-t border-separator space-y-1 flex flex-col">
         {SYSTEM_TOOLS.map((tool) => (
           <NavItem key={tool.id} tool={tool} pathname={pathname} collapsed={collapsed} />
         ))}

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react"
 import { Button, Chip, ListBox, Select, Separator, Toolbar, Tooltip } from "@heroui/react"
 import { ArrowLeftRight, FolderOpen, GitCompareArrows } from "lucide-react"
 import { DiffView } from "./DiffView"
-import { kvGet, kvKeys } from "@/utils/db"
+import { kvGetAll } from "@/utils/db"
 import { LoadModal } from "@/components/LoadModal"
 import { ToolHeader } from "@/components/ToolHeader"
 import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
@@ -41,12 +41,10 @@ export function CodeCompare() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([])
 
   const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys()
+    const all = await kvGetAll<Record<string, unknown>>()
     const items: SavedItem[] = []
-    for (const key of keys) {
-      if (!key.includes(":saved:")) continue
-      const item = await kvGet<Record<string, unknown>>(key)
-      if (!item) continue
+    for (const [key, item] of all) {
+      if (!key.includes(":saved:") || !item) continue
       const tool = CATEGORY_BY_KEY(key)
       const content =
         (item.html as string) ||

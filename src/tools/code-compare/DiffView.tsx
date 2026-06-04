@@ -110,10 +110,23 @@ export function DiffView({
         ;(el as HTMLElement).style.setProperty("overflow-y", "auto", "important")
       })
     }
-    setTimeout(setEditorHeight, 0)
-    setTimeout(setEditorHeight, 100)
+
+    // 用 MutationObserver 监听 CM 编辑器 DOM 就绪，比 setTimeout 更可靠
+    const observer = new MutationObserver(() => {
+      const hasEditors = containerRef.current?.querySelectorAll(".cm-mergeViewEditor .cm-editor")
+      if (hasEditors && hasEditors.length > 0) {
+        setEditorHeight()
+        observer.disconnect()
+      }
+    })
+    if (containerRef.current) {
+      observer.observe(containerRef.current, { childList: true, subtree: true })
+    }
+    // 兜底：初始就尝试一次
+    setEditorHeight()
 
     return () => {
+      observer.disconnect()
       mergeView.destroy()
       mergeViewRef.current = null
     }

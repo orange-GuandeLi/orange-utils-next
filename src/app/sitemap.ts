@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const BASE_URL = "http://utils.orange-ai.site";
+const BASE_URL = "https://utils.orange-ai.site";
 
 const tools = [
   { path: "/tools/html-selector", priority: 0.9 },

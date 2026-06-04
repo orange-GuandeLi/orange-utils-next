@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Button,
   Chip,
@@ -29,7 +30,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
-import { kvDelete, kvGet, kvKeys, kvSet } from "@/utils/db"
+import { kvDelete, kvGetAll, kvSet } from "@/utils/db"
 import { CodeEditor } from "@/components/CodeEditor"
 import { ModalShell } from "@/components/ModalShell"
 import { RESOURCE_CATEGORIES, type ToolDef } from "@/lib/tool-registry"
@@ -57,6 +58,7 @@ function iconFor(id: string) {
 }
 
 export function ResourceManager() {
+  const router = useRouter()
   const [allItems, setAllItems] = useState<ResourceItem[]>([])
   const [activeCategory, setActiveCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -75,18 +77,17 @@ export function ResourceManager() {
     raw: Record<string, unknown>
   } | null>(null)
   const [busy, setBusy] = useState<null | "export" | "import" | "create">(null)
+  const [deleteTarget, setDeleteTarget] = useState<ResourceItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const categories: ToolDef[] = RESOURCE_CATEGORIES
 
   const loadAll = useCallback(async () => {
-    const keys = await kvKeys()
+    const all = await kvGetAll<Record<string, unknown>>()
     const items: ResourceItem[] = []
 
-    for (const key of keys) {
-      if (!key.includes(":saved:")) continue
-      const value = await kvGet<Record<string, unknown>>(key)
-      if (!value) continue
+    for (const [key, value] of all) {
+      if (!key.includes(":saved:") || !value) continue
 
       const category = categories.find((c) => key.startsWith(c.prefix!))
       if (!category) continue
@@ -127,13 +128,19 @@ export function ResourceManager() {
     return true
   })
 
-  const handleDelete = async (key: string) => {
-    await kvDelete(key)
+  const handleDelete = (item: ResourceItem) => {
+    setDeleteTarget(item)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    await kvDelete(deleteTarget._key)
     void loadAll()
-    if (detailItem?._key === key) {
+    if (detailItem?._key === deleteTarget._key) {
       setDetailOpen(false)
       setDetailItem(null)
     }
+    setDeleteTarget(null)
   }
 
   const handleCreate = async () => {
@@ -159,13 +166,10 @@ export function ResourceManager() {
   const handleExport = async () => {
     setBusy("export")
     try {
-      const keys = await kvKeys()
+      const all = await kvGetAll()
       const data: Record<string, unknown> = {}
-      for (const key of keys) {
-        if (key.includes(":saved:")) {
-          const value = await kvGet(key)
-          if (value !== undefined) data[key] = value
-        }
+      for (const [key, value] of all) {
+        if (key.includes(":saved:")) data[key] = value
       }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
       const url = URL.createObjectURL(blob)
@@ -203,16 +207,17 @@ export function ResourceManager() {
     setBusy("import")
     try {
       if (mode === "overwrite") {
-        const keys = await kvKeys()
-        for (const key of keys) {
+        const all = await kvGetAll()
+        for (const key of all.keys()) {
           if (key.includes(":saved:")) await kvDelete(key)
         }
       }
+      // merge mode: pre-load existing keys to avoid per-key lookup
+      const existingKeys = mode === "merge" ? new Set((await kvGetAll()).keys()) : null
       for (const [key, value] of Object.entries(importPreview.raw)) {
         if (key.includes(":saved:")) {
           if (mode === "merge") {
-            const existing = await kvGet(key)
-            if (existing === undefined) await kvSet(key, value)
+            if (!existingKeys!.has(key)) await kvSet(key, value)
           } else {
             await kvSet(key, value)
           }
@@ -417,7 +422,7 @@ export function ResourceManager() {
                                 const url = item.name
                                   ? `${category.href}?load=${encodeURIComponent(item.name)}`
                                   : category.href
-                                window.location.href = url
+                                router.push(url)
                               }}
                             >
                               <ExternalLink size={14} />
@@ -431,7 +436,7 @@ export function ResourceManager() {
                             size="sm"
                             variant="ghost"
                             aria-label="删除"
-                            onPress={() => handleDelete(item._key)}
+                            onPress={() => handleDelete(item)}
                           >
                             <Trash2 size={14} className="text-danger" />
                           </Button>
@@ -454,7 +459,7 @@ export function ResourceManager() {
         icon={Eye}
         size="lg"
       >
-        <div className="h-80 min-h-0">
+        <div className="max-h-80 min-h-40 h-auto">
           <CodeEditor value={detailItem?.content || ""} language="html" readOnly />
         </div>
         <div className="flex justify-end gap-2 mt-4">
@@ -465,7 +470,7 @@ export function ResourceManager() {
             <Button
               variant="danger"
               onPress={() => {
-                void handleDelete(detailItem._key)
+                handleDelete(detailItem)
                 setDetailOpen(false)
               }}
             >
@@ -546,6 +551,26 @@ export function ResourceManager() {
             onPress={() => void handleImportConfirm("overwrite")}
           >
             {({ isPending }) => <>{isPending ? "覆盖中…" : "覆盖"}</>}
+          </Button>
+        </div>
+      </ModalShell>
+
+      <ModalShell
+        isOpen={!!deleteTarget}
+        onOpenChangeAction={(o) => { if (!o) setDeleteTarget(null) }}
+        title="确认删除"
+        icon={Trash2}
+        size="xs"
+      >
+        <p className="text-sm text-muted">
+          确定要删除「<span className="text-foreground font-medium">{deleteTarget?.name}</span>」吗？此操作不可撤销。
+        </p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
+            取消
+          </Button>
+          <Button variant="danger" onPress={() => void confirmDelete()}>
+            删除
           </Button>
         </div>
       </ModalShell>

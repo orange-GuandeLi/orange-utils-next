@@ -33,12 +33,17 @@ export function LoadModal<T extends LoadModalItem>({
   renderMetaAction: renderMeta,
 }: LoadModalProps<T>) {
   const [query, setQuery] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<T | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // 打开时清空搜索并聚焦
   // isOpen 是父组件控制的弹窗状态，此处根据 isOpen 转移重置 query 是合理的副作用
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 关闭时重置是合理的副作用
+      setDeleteTarget(null)
+      return
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuery("")
     requestAnimationFrame(() => inputRef.current?.focus())
@@ -88,8 +93,13 @@ export function LoadModal<T extends LoadModalItem>({
           {filtered.map((item) => (
             <div
               key={item.id || item.name}
+              role="button"
+              tabIndex={0}
               className="group flex items-center gap-3 p-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary transition-colors cursor-pointer"
               onClick={() => onLoad(item)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onLoad(item)
+              }}
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{item.name}</div>
@@ -110,7 +120,7 @@ export function LoadModal<T extends LoadModalItem>({
                         size="sm"
                         variant="ghost"
                         aria-label="删除"
-                        onPress={() => onDelete(item)}
+                        onPress={() => setDeleteTarget(item)}
                       >
                         <Trash2 size={14} className="text-danger" />
                       </Button>
@@ -121,6 +131,32 @@ export function LoadModal<T extends LoadModalItem>({
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
+          <div className="bg-background rounded-lg shadow-lg p-4 max-w-xs w-full mx-4 border border-separator">
+            <p className="text-sm text-muted mb-4">
+              确定要删除「<span className="text-foreground font-medium">{deleteTarget.name}</span>
+              」吗？
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onPress={() => setDeleteTarget(null)}>
+                取消
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                onPress={() => {
+                  onDelete?.(deleteTarget)
+                  setDeleteTarget(null)
+                }}
+              >
+                删除
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </ModalShell>

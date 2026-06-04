@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button, Description, FieldError, Input, Label, TextField } from "@heroui/react"
 import { Save } from "lucide-react"
 import { ModalShell } from "./ModalShell"
@@ -24,8 +24,15 @@ export function SaveModal({
   onSaveAction: onSave,
   placeholder = "输入名称",
 }: SaveModalProps) {
-  // 用户是否“动过手”：避免首次打开就显示红色错误
+  // 用户是否"动过手"：避免首次打开就显示红色错误
   const [touched, setTouched] = useState(false)
+
+  // 关闭时重置 touched 状态，避免下次打开残留验证错误
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 关闭时重置是合理的副作用
+    if (!isOpen) setTouched(false)
+  }, [isOpen])
+
   const trimmed = name.trim()
   const showError = touched && trimmed.length === 0
   return (

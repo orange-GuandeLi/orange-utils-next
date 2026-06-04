@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { kvDelete, kvGet, kvKeys, kvSet } from "@/utils/db"
+import { kvDelete, kvGetAll, kvSet } from "@/utils/db"
 
 export type SavedItem = {
   name: string
@@ -23,11 +23,10 @@ export function useResource<T extends SavedItem>(prefix: string) {
   const [saveName, setSaveName] = useState("")
 
   const refresh = useCallback(async () => {
-    const keys = (await kvKeys()).filter((k) => k.startsWith(prefix))
+    const all = await kvGetAll<T>()
     const entries: T[] = []
-    for (const key of keys) {
-      const v = await kvGet<T>(key)
-      if (v) entries.push(v as T)
+    for (const [key, value] of all) {
+      if (key.startsWith(prefix)) entries.push(value)
     }
     entries.sort((a, b) => b.savedAt - a.savedAt)
     setItems(entries)

@@ -10,7 +10,7 @@ import { SaveModal } from "@/components/SaveModal"
 import { ModalShell } from "@/components/ModalShell"
 import { CodeEditor } from "@/components/CodeEditor"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
-import { kvGet, kvKeys } from "@/utils/db"
+import { kvGet, kvGetAll } from "@/utils/db"
 import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
 
 type Header = { key: string; value: string }
@@ -64,7 +64,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   )
 
   const loadAvailableVars = useCallback(async () => {
-    const keys = await kvKeys()
+    const all = await kvGetAll<Record<string, unknown>>()
     const rows: {
       id: string
       name: string
@@ -72,10 +72,8 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
       varKey: string
       savedAt: number
     }[] = []
-    for (const key of keys) {
-      if (!key.includes(":saved:")) continue
-      const item = await kvGet<Record<string, unknown>>(key)
-      if (!item) continue
+    for (const [key, item] of all) {
+      if (!key.includes(":saved:") || !item) continue
       const name = (item.name as string) || key.replace(/^.*?:saved:/, "")
       const savedAt = (item.savedAt as number) || 0
       const toolPrefix = key.split(":")[0]
@@ -131,6 +129,13 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   const handleSend = async () => {
     if (!url.trim()) {
       setError("请输入 URL")
+      return
+    }
+    // 基本 URL 格式校验
+    try {
+      new URL(url.trim())
+    } catch {
+      setError("URL 格式不正确，请包含协议（如 https://）")
       return
     }
     setLoading(true)
