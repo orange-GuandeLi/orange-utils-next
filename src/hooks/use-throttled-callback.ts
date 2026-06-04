@@ -26,7 +26,7 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
   fn: T,
   wait = 250,
   dependencies: React.DependencyList = [],
-  options: ThrottleSettings = defaultOptions
+  options: ThrottleSettings = defaultOptions,
 ): {
   (this: ThisParameterType<T>, ...args: Parameters<T>): ReturnType<T>
   cancel: () => void
@@ -34,8 +34,9 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
 } {
   const handler = useMemo(
     () => throttle<T>(fn, wait, options),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    dependencies
+    // 接受动态依赖数组是 API 设计：按依赖列表重建节流函数
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
+    dependencies,
   )
 
   useUnmount(() => {

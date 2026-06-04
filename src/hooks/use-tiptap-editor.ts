@@ -23,12 +23,12 @@ export function useTiptapEditor(providedEditor?: Editor | null): {
 
   useEffect(() => {
     if (!mainEditor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mainEditor 未就绪时清空
       setStorageEditor(null)
       return
     }
 
-    const updateHandler = () =>
-      setStorageEditor(getActivePageEditor(mainEditor))
+    const updateHandler = () => setStorageEditor(getActivePageEditor(mainEditor))
 
     updateHandler()
 

@@ -1,13 +1,10 @@
+/* eslint-disable react-hooks/immutability -- Radix UI 风格的 ref 合并：调用者是 React 内部 ref 回调 */
 "use client"
 
 import { useCallback, useRef } from "react"
 
 // basically Exclude<React.ClassAttributes<T>["ref"], string>
-type UserRef<T> =
-  | ((instance: T | null) => void)
-  | React.RefObject<T | null>
-  | null
-  | undefined
+type UserRef<T> = ((instance: T | null) => void) | React.RefObject<T | null> | null | undefined
 
 const updateRef = <T>(ref: NonNullable<UserRef<T>>, value: T | null) => {
   if (typeof ref === "function") {
@@ -20,10 +17,11 @@ const updateRef = <T>(ref: NonNullable<UserRef<T>>, value: T | null) => {
 
 export const useComposedRef = <T extends HTMLElement>(
   libRef: React.RefObject<T | null>,
-  userRef: UserRef<T>
+  userRef: UserRef<T>,
 ) => {
   const prevUserRef = useRef<UserRef<T>>(null)
 
+  // Radix UI 风格的 ref 合并：调用者是 React 内部 ref 回调，实例由 React 提供
   return useCallback(
     (instance: T | null) => {
       if (libRef && "current" in libRef) {
@@ -40,7 +38,7 @@ export const useComposedRef = <T extends HTMLElement>(
         updateRef(userRef, instance)
       }
     },
-    [libRef, userRef]
+    [libRef, userRef],
   )
 }
 

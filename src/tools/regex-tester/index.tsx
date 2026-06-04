@@ -1,276 +1,248 @@
-"use client";
+"use client"
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Button, Chip, Tooltip, Input, toast } from "@heroui/react";
-import { Regex, Copy, Check, Plus } from "lucide-react";
-import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
-import { LoadModal } from "../../components/LoadModal";
-import { SaveModal } from "../../components/SaveModal";
-import { ToolHeader } from "../../components/ToolHeader";
-import { ToolActionButtons } from "../../components/ToolActionButtons";
-import { ModalShell } from "../../components/ModalShell";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Button, Chip, Input, Tooltip, toast } from "@heroui/react"
+import { Check, Copy, Plus, Regex } from "lucide-react"
+import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { LoadModal } from "@/components/LoadModal"
+import { SaveModal } from "@/components/SaveModal"
+import { ToolHeader } from "@/components/ToolHeader"
+import { ToolActionButtons } from "@/components/ToolActionButtons"
+import { ModalShell } from "@/components/ModalShell"
+import { kvGet, kvKeys } from "@/utils/db"
+import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
+
+type RegexSaved = SavedItem & {
+  pattern: string
+  flags: string[]
+  testString: string
+}
 
 type MatchResult = {
-  text: string;
-  index: number;
-  length: number;
-  groups?: Record<string, string>;
-};
+  text: string
+  index: number
+  length: number
+  groups?: Record<string, string>
+}
+
+type WorkerOut = { matches: MatchResult[]; error: string | null }
 
 const FLAG_OPTIONS = [
   { id: "g", name: "g", description: "全局匹配" },
   { id: "i", name: "i", description: "忽略大小写" },
   { id: "m", name: "m", description: "多行模式" },
   { id: "s", name: "s", description: "点号匹配换行" },
-];
+] as const
+
+type FlagId = (typeof FLAG_OPTIONS)[number]["id"]
+
+const STORAGE_PREFIX = TOOL_REGISTRY["regex-tester"].prefix!
 
 export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
-  const [pattern, setPattern] = useState("");
-  const [flags, setFlags] = useState<Set<string>>(new Set(["g"]));
-  const [testString, setTestString] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [savedItems, setSavedItems] = useState<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }[]>([]);
-  const [currentName, setCurrentName] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [varModalOpen, setVarModalOpen] = useState(false);
-  const [availableVars, setAvailableVars] = useState<{ id: string; name: string; toolName: string; content: string; savedAt: number }[]>([]);
+  const [pattern, setPattern] = useState("")
+  const [flags, setFlags] = useState<Set<FlagId>>(new Set<FlagId>(["g"]))
+  const [testString, setTestString] = useState("")
+  const [matches, setMatches] = useState<MatchResult[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  // 加载已保存列表
-  const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys();
-    const items: { name: string; pattern: string; flags: string[]; testString: string; savedAt: number }[] = [];
-    for (const key of keys) {
-      if (key.startsWith("regex:saved:")) {
-        const item = await kvGet<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }>(key);
-        if (item) items.push(item);
-      }
-    }
-    items.sort((a, b) => b.savedAt - a.savedAt);
-    setSavedItems(items);
-  }, []);
+  const resource = useResource<RegexSaved>(STORAGE_PREFIX)
 
-  useEffect(() => {
-    if (loadModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadSavedList();
-    }
-  }, [loadModalOpen, loadSavedList]);
+  const [varModalOpen, setVarModalOpen] = useState(false)
+  const [availableVars, setAvailableVars] = useState<
+    { id: string; name: string; toolName: string; content: string; savedAt: number }[]
+  >([])
+  const [copied, setCopied] = useState(false)
 
-  // 从 URL 参数加载已保存的正则
-  useEffect(() => {
-    if (!initialLoadName) return;
-    (async () => {
-      const item = await kvGet<{ name: string; pattern: string; flags: string[]; testString: string; savedAt: number }>(`regex:saved:${initialLoadName}`);
-      if (item) {
-        setPattern(item.pattern);
-        setFlags(new Set(item.flags));
-        setTestString(item.testString);
-        setCurrentName(item.name);
-        setDirty(false);
-      }
-    })();
-  }, [initialLoadName]);
-
-  // 保存
-  const handleSave = async () => {
-    if (currentName) {
-      await kvSet(`regex:saved:${currentName}`, {
-        name: currentName,
-        pattern,
-        flags: Array.from(flags),
-        testString,
-        savedAt: Date.now(),
-      });
-      setDirty(false);
-      toast.success(`已保存「${currentName}」`);
-      return;
-    }
-    setSaveName("");
-    setSaveModalOpen(true);
-  };
-
-  // 保存确认（新建名称）
-  const handleSaveConfirm = async () => {
-    if (!saveName.trim()) return;
-    await kvSet(`regex:saved:${saveName}`, {
-      name: saveName,
+  const buildConfig = useCallback(
+    (): Omit<RegexSaved, "name" | "savedAt"> => ({
       pattern,
       flags: Array.from(flags),
       testString,
-      savedAt: Date.now(),
-    });
-    setCurrentName(saveName);
-    setSaveModalOpen(false);
-    setSaveName("");
-    setDirty(false);
-    toast.success(`已保存「${saveName}」`);
-  };
+    }),
+    [pattern, flags, testString],
+  )
 
-  // 加载
-  const handleLoad = (item: { name: string; pattern: string; flags: string[]; testString: string }) => {
-    setPattern(item.pattern);
-    setFlags(new Set(item.flags));
-    setTestString(item.testString);
-    setCurrentName(item.name);
-    setDirty(false);
-    setLoadModalOpen(false);
-  };
+  // URL 参数加载（仅执行一次）
+  useEffect(() => {
+    if (!initialLoadName) return
+    void (async () => {
+      const item = await kvGet<RegexSaved>(STORAGE_PREFIX + initialLoadName)
+      if (!item) return
+      setPattern(item.pattern)
+      setFlags(new Set(item.flags as FlagId[]))
+      setTestString(item.testString)
+      resource.load(item)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoadName])
 
-  // 删除
-  const handleDelete = async (name: string) => {
-    await kvDelete(`regex:saved:${name}`);
-    if (currentName === name) setCurrentName(null);
-    loadSavedList();
-  };
-
-  // 另存为
-  const handleSaveAs = () => {
-    setSaveName(currentName || "");
-    setSaveModalOpen(true);
-  };
-
-  // 计算匹配结果
-  // 正则匹配结果（Web Worker 防止灾难性回溯卡死主线程）
-  const [matches, setMatches] = useState<MatchResult[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 正则执行：Web Worker 防灾难性回溯
+  const workerRef = useRef<Worker | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!pattern || !testString) {
-      setMatches([]);
-      setError(null);
-      return;
+      /* eslint-disable react-hooks/set-state-in-effect -- 清空结果：依赖清空时重置是合理副作用 */
+      setMatches([])
+      setError(null)
+      /* eslint-enable react-hooks/set-state-in-effect */
+      return
     }
 
     // 终止上一次 worker
-    if (workerRef.current) { workerRef.current.terminate(); workerRef.current = null; }
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (workerRef.current) {
+      workerRef.current.terminate()
+      workerRef.current = null
+    }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
 
-    const worker = new Worker(
-      new URL("./regex.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    workerRef.current = worker;
+    const worker = new Worker(new URL("./regex.worker.ts", import.meta.url), { type: "module" })
+    workerRef.current = worker
 
-    worker.onmessage = (e) => {
-      const { matches: m, error: err } = e.data as { matches: MatchResult[]; error: string | null };
-      setMatches(m);
-      setError(err);
-      worker.terminate();
-      workerRef.current = null;
-    };
+    worker.onmessage = (e: MessageEvent<WorkerOut>) => {
+      const { matches: m, error: err } = e.data
+      setMatches(m)
+      setError(err)
+      worker.terminate()
+      workerRef.current = null
+    }
 
     worker.onerror = () => {
-      setMatches([]);
-      setError("Worker 执行出错");
-      worker.terminate();
-      workerRef.current = null;
-    };
+      setMatches([])
+      setError("Worker 执行出错")
+      worker.terminate()
+      workerRef.current = null
+    }
 
-    worker.postMessage({ pattern, flags: Array.from(flags).join(""), testString });
+    worker.postMessage({ pattern, flags: Array.from(flags).join(""), testString })
 
-    // 500ms 超时保护（Worker 内部 200ms 已有，这里是兜底）
+    // 500ms 兜底超时
     timerRef.current = setTimeout(() => {
       if (workerRef.current === worker) {
-        worker.terminate();
-        workerRef.current = null;
-        setMatches([]);
-        setError("正则执行超时（500ms），可能存在灾难性回溯");
+        worker.terminate()
+        workerRef.current = null
+        setMatches([])
+        setError("正则执行超时（500ms），可能存在灾难性回溯")
       }
-    }, 500);
+    }, 500)
 
     return () => {
-      worker.terminate();
-      workerRef.current = null;
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    };
-  }, [pattern, flags, testString]);
+      worker.terminate()
+      workerRef.current = null
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [pattern, flags, testString])
 
   // 高亮匹配文本
   const highlightedText = useMemo(() => {
-    if (!matches.length || !testString) return null;
-    const parts: { text: string; isMatch: boolean; matchIndex?: number }[] = [];
-    let lastIndex = 0;
+    if (!matches.length || !testString) return null
+    const parts: { text: string; isMatch: boolean; matchIndex?: number }[] = []
+    let lastIndex = 0
 
     matches.forEach((match, i) => {
       if (match.index > lastIndex) {
-        parts.push({ text: testString.slice(lastIndex, match.index), isMatch: false });
+        parts.push({ text: testString.slice(lastIndex, match.index), isMatch: false })
       }
-      parts.push({ text: match.text, isMatch: true, matchIndex: i });
-      lastIndex = match.index + match.length;
-    });
+      parts.push({ text: match.text, isMatch: true, matchIndex: i })
+      lastIndex = match.index + match.length
+    })
 
     if (lastIndex < testString.length) {
-      parts.push({ text: testString.slice(lastIndex), isMatch: false });
+      parts.push({ text: testString.slice(lastIndex), isMatch: false })
     }
 
-    return parts;
-  }, [matches, testString]);
+    return parts
+  }, [matches, testString])
 
-  const toggleFlag = (flag: string) => {
+  const toggleFlag = (flag: FlagId) => {
     setFlags((prev) => {
-      const next = new Set(prev);
-      if (next.has(flag)) next.delete(flag);
-      else next.add(flag);
-      return next;
-    });
-    setDirty(true);
-  };
+      const next = new Set(prev)
+      if (next.has(flag)) next.delete(flag)
+      else next.add(flag)
+      return next
+    })
+    resource.setDirty(true)
+  }
 
   const copyPattern = () => {
-    navigator.clipboard.writeText(`/${pattern}/${Array.from(flags).join("")}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+    navigator.clipboard.writeText(`/${pattern}/${Array.from(flags).join("")}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
-  // 工具名称映射
-  const TOOL_NAMES: Record<string, string> = {
-    "html-selector": "HTML 选择器",
-    "api-request": "API 请求",
-    "regex": "正则测试",
-    "notes": "Markdown",
-    "manual": "手动创建",
-  };
-
-  // 加载可用变量（其他工具保存的数据）
   const loadAvailableVars = useCallback(async () => {
-    const keys = await kvKeys();
-    const vars: { id: string; name: string; toolName: string; content: string; savedAt: number }[] = [];
+    const keys = await kvKeys()
+    const rows: {
+      id: string
+      name: string
+      toolName: string
+      content: string
+      savedAt: number
+    }[] = []
     for (const key of keys) {
-      if (!key.includes(":saved:")) continue;
-      const item = await kvGet<Record<string, unknown>>(key);
-      if (!item) continue;
-      const name = (item.name as string) || key.replace(/^.*?:saved:/, "");
-      const content = (item.html as string) || (item.content as string) || (item.body as string) || (item.testString as string) || "";
-      const savedAt = (item.savedAt as number) || 0;
-      const toolPrefix = key.split(":")[0];
-      const toolName = TOOL_NAMES[toolPrefix] || toolPrefix;
-      if (content) vars.push({ id: key, name, toolName, content, savedAt });
+      if (!key.includes(":saved:")) continue
+      const item = await kvGet<Record<string, unknown>>(key)
+      if (!item) continue
+      const name = (item.name as string) || key.replace(/^.*?:saved:/, "")
+      const content =
+        (item.html as string) ||
+        (item.content as string) ||
+        (item.body as string) ||
+        (item.testString as string) ||
+        ""
+      const savedAt = (item.savedAt as number) || 0
+      const toolPrefix = key.split(":")[0]
+      const toolName = TOOL_NAME_LABELS[toolPrefix] || toolPrefix
+      if (content) {
+        rows.push({ id: key, name, toolName, content, savedAt })
+      }
     }
-    vars.sort((a, b) => b.savedAt - a.savedAt);
-    setAvailableVars(vars);
-  }, []);
+    rows.sort((a, b) => b.savedAt - a.savedAt)
+    setAvailableVars(rows)
+  }, [])
 
-  useEffect(() => {
-    if (varModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadAvailableVars();
+  const openVarModal = () => {
+    void loadAvailableVars()
+    setVarModalOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (resource.currentName) {
+      const ok = await resource.overwrite(buildConfig() as RegexSaved)
+      if (ok) toast.success(`已保存「${resource.currentName}」`)
+    } else {
+      resource.openSave()
     }
-  }, [varModalOpen, loadAvailableVars]);
+  }
+
+  const handleSaveConfirm = async () => {
+    const name = await resource.save(buildConfig() as RegexSaved)
+    if (name) toast.success(`已保存「${name}」`)
+  }
+
+  const handleLoad = (item: RegexSaved) => {
+    const loaded = resource.load(item)
+    setPattern(loaded.pattern)
+    setFlags(new Set(loaded.flags as FlagId[]))
+    setTestString(loaded.testString)
+  }
+
+  const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
   const insertVar = (content: string) => {
-    setTestString((prev) => prev + content);
-    setDirty(true);
-    setVarModalOpen(false);
-  };
+    setTestString((prev) => prev + content)
+    resource.setDirty(true)
+    setVarModalOpen(false)
+  }
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
-      {/* Header */}
       <ToolHeader
         icon={Regex}
         title="正则测试"
@@ -283,17 +255,16 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
               </Chip.Label>
             </Chip>
             <ToolActionButtons
-              currentName={currentName}
-              dirty={dirty}
-              onSave={handleSave}
-              onSaveAs={handleSaveAs}
-              onLoad={() => setLoadModalOpen(true)}
+              currentName={resource.currentName}
+              dirty={resource.dirty}
+              onSaveAction={handleSave}
+              onSaveAsAction={handleSaveAs}
+              onLoadAction={resource.openLoad}
             />
           </>
         }
       />
 
-      {/* 正则输入 */}
       <div className="px-5 py-3 border-b border-separator bg-surface">
         <div className="flex items-center gap-2">
           <span className="text-muted text-sm">/</span>
@@ -301,7 +272,10 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
             className="flex-1 font-mono"
             placeholder="输入正则表达式..."
             value={pattern}
-            onChange={(e) => { setPattern((e.target as HTMLInputElement).value); setDirty(true); }}
+            onChange={(e) => {
+              setPattern(e.target.value)
+              resource.setDirty(true)
+            }}
           />
           <span className="text-muted text-sm">/</span>
           <div className="flex gap-1">
@@ -318,30 +292,32 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
             ))}
           </div>
           <Tooltip delay={0}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="复制正则" onPress={copyPattern}>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label="复制正则"
+              onPress={copyPattern}
+            >
               {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
             </Button>
             <Tooltip.Content>{copied ? "已复制" : "复制正则"}</Tooltip.Content>
           </Tooltip>
         </div>
-        {error && (
-          <p className="text-xs text-danger mt-2 font-mono">{error}</p>
-        )}
+        {error && <p className="text-xs text-danger mt-2 font-mono">{error}</p>}
       </div>
 
-      {/* 主内容区 */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* 左：测试文本 */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-separator">
           <div className="h-9 px-4 flex items-center border-b border-separator bg-surface shrink-0">
             <span className="text-xs text-muted font-medium">测试文本</span>
             <div className="flex-1" />
-            <Button size="sm" variant="ghost" onPress={() => setVarModalOpen(true)}>
-              <Plus size={12} /><span className="text-xs">插入变量</span>
+            <Button size="sm" variant="ghost" onPress={openVarModal}>
+              <Plus size={12} />
+              <span className="text-xs">插入变量</span>
             </Button>
           </div>
           <div className="flex-1 relative">
-            {/* 高亮层 */}
             {highlightedText && (
               <div className="absolute inset-0 p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all pointer-events-none overflow-auto">
                 {highlightedText.map((part, i) => (
@@ -354,18 +330,22 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
                 ))}
               </div>
             )}
-            {/* 输入框 */}
             <textarea
               className="w-full h-full p-4 font-mono text-sm leading-relaxed bg-transparent resize-none outline-none"
-              style={{ color: highlightedText ? "transparent" : undefined, caretColor: "var(--foreground)" }}
+              style={{
+                color: highlightedText ? "transparent" : undefined,
+                caretColor: "var(--foreground)",
+              }}
               placeholder="输入要测试的文本..."
               value={testString}
-              onChange={(e) => { setTestString(e.target.value); setDirty(true); }}
+              onChange={(e) => {
+                setTestString(e.target.value)
+                resource.setDirty(true)
+              }}
             />
           </div>
         </div>
 
-        {/* 右：匹配结果 */}
         <div className="w-80 flex flex-col min-w-0 bg-surface">
           <div className="h-9 px-4 flex items-center border-b border-separator shrink-0">
             <span className="text-xs text-muted font-medium">匹配结果</span>
@@ -412,37 +392,40 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
           </div>
         </div>
       </div>
-      {/* 保存 Modal */}
+
       <SaveModal
-        isOpen={saveModalOpen}
-        onOpenChange={setSaveModalOpen}
-        title={currentName ? "另存为" : "保存正则"}
-        name={saveName}
-        onNameChange={setSaveName}
-        onSave={handleSaveConfirm}
+        isOpen={resource.saveOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeSave())}
+        title={resource.currentName ? "另存为" : "保存正则"}
+        name={resource.saveName}
+        onNameChangeAction={resource.setSaveName}
+        onSaveAction={handleSaveConfirm}
         placeholder="给这个正则起个名字"
       />
 
       <LoadModal
-        isOpen={loadModalOpen}
-        onOpenChange={setLoadModalOpen}
+        isOpen={resource.loadOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeLoad())}
         title="加载已保存的正则"
-        items={savedItems}
-        onLoad={handleLoad}
-        onDelete={(item) => handleDelete(item.name)}
+        items={resource.items}
+        onLoadAction={handleLoad}
+        onDeleteAction={resource.remove}
         emptyText="暂无保存的正则"
       />
 
-      {/* 插入变量 Modal */}
       <ModalShell
         isOpen={varModalOpen}
-        onOpenChange={setVarModalOpen}
+        onOpenChangeAction={setVarModalOpen}
         title="插入变量"
         icon={Plus}
       >
-        <p className="text-xs text-muted mb-3">从其他工具保存的数据中选择内容，插入到测试文本中。</p>
+        <p className="text-xs text-muted mb-3">
+          从其他工具保存的数据中选择内容，插入到测试文本中。
+        </p>
         {availableVars.length === 0 ? (
-          <p className="text-sm text-muted text-center py-4">暂无可用数据，请先在其他工具中保存内容</p>
+          <p className="text-sm text-muted text-center py-4">
+            暂无可用数据，请先在其他工具中保存内容
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {availableVars.map((v) => (
@@ -468,5 +451,5 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
         )}
       </ModalShell>
     </div>
-  );
+  )
 }

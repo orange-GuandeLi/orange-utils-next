@@ -1,62 +1,57 @@
-"use client";
+"use client"
 
-import { ReactNode, useState, useMemo, useRef, useEffect } from "react";
-import { Button, Tooltip, TextField, InputGroup, Label } from "@heroui/react";
-import { FolderOpen, Trash2, Search, X } from "lucide-react";
-import { ModalShell } from "./ModalShell";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { Button, Tooltip, TextField, InputGroup, Label } from "@heroui/react"
+import { FolderOpen, Trash2, Search, X } from "lucide-react"
+import { ModalShell } from "./ModalShell"
 
 type LoadModalItem = {
-  id?: string;
-  name: string;
-  savedAt: number;
-};
+  id?: string
+  name: string
+  savedAt: number
+}
 
 type LoadModalProps<T extends LoadModalItem> = {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  items: T[];
-  onLoad: (item: T) => void;
-  onDelete?: (item: T) => void;
-  emptyText?: string;
-  renderMeta?: (item: T) => ReactNode;
-};
+  isOpen: boolean
+  onOpenChangeAction: (open: boolean) => void
+  title: string
+  items: T[]
+  onLoadAction: (item: T) => void
+  onDeleteAction?: (item: T) => void
+  emptyText?: string
+  renderMetaAction?: (item: T) => ReactNode
+}
 
 export function LoadModal<T extends LoadModalItem>({
   isOpen,
-  onOpenChange,
+  onOpenChangeAction: onOpenChange,
   title,
   items,
-  onLoad,
-  onDelete,
+  onLoadAction: onLoad,
+  onDeleteAction: onDelete,
   emptyText = "暂无保存的内容",
-  renderMeta,
+  renderMetaAction: renderMeta,
 }: LoadModalProps<T>) {
-  const [query, setQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // 打开时清空搜索并聚焦
+  // isOpen 是父组件控制的弹窗状态，此处根据 isOpen 转移重置 query 是合理的副作用
   useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [isOpen]);
+    if (!isOpen) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQuery("")
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }, [isOpen])
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return items;
-    const q = query.trim().toLowerCase();
-    return items.filter((item) => item.name.toLowerCase().includes(q));
-  }, [items, query]);
+    if (!query.trim()) return items
+    const q = query.trim().toLowerCase()
+    return items.filter((item) => item.name.toLowerCase().includes(q))
+  }, [items, query])
 
   return (
-    <ModalShell
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      title={title}
-      icon={FolderOpen}
-    >
-      {/* 搜索框 */}
+    <ModalShell isOpen={isOpen} onOpenChangeAction={onOpenChange} title={title} icon={FolderOpen}>
       {items.length > 0 && (
         <div className="mb-3">
           <TextField value={query} onChange={setQuery}>
@@ -129,5 +124,5 @@ export function LoadModal<T extends LoadModalItem>({
         </div>
       )}
     </ModalShell>
-  );
+  )
 }

@@ -177,10 +177,10 @@ const MobileToolbarContent = ({
 
 export function SimpleEditor({
   initialContent,
-  onUpdate,
+  onUpdateAction: onUpdate,
 }: {
   initialContent?: string
-  onUpdate?: (html: string) => void
+  onUpdateAction?: (html: string) => void
 } = {}) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()

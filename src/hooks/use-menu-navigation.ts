@@ -61,9 +61,7 @@ export function useMenuNavigation<T>({
   orientation = "vertical",
   autoSelectFirstItem = true,
 }: MenuNavigationOptions<T>) {
-  const [selectedIndex, setSelectedIndex] = useState<number>(
-    autoSelectFirstItem ? 0 : -1
-  )
+  const [selectedIndex, setSelectedIndex] = useState<number>(autoSelectFirstItem ? 0 : -1)
 
   useEffect(() => {
     const handleKeyboardNavigation = (event: KeyboardEvent) => {
@@ -164,27 +162,16 @@ export function useMenuNavigation<T>({
       targetElement.addEventListener("keydown", handleKeyboardNavigation, true)
 
       return () => {
-        targetElement?.removeEventListener(
-          "keydown",
-          handleKeyboardNavigation,
-          true
-        )
+        targetElement?.removeEventListener("keydown", handleKeyboardNavigation, true)
       }
     }
 
     return undefined
-  }, [
-    editor,
-    containerRef,
-    items,
-    selectedIndex,
-    onSelect,
-    onClose,
-    orientation,
-  ])
+  }, [editor, containerRef, items, selectedIndex, onSelect, onClose, orientation])
 
   useEffect(() => {
     if (query) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- query 变化时重置选中项
       setSelectedIndex(autoSelectFirstItem ? 0 : -1)
     }
   }, [query, autoSelectFirstItem])

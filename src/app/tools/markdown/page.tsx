@@ -1,131 +1,74 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { Button, Input, Tooltip, Label, TextField, Chip, toast } from "@heroui/react";
-import { Save, FolderOpen, Trash2, FileDown, FileCode } from "lucide-react";
-import { LoadModal } from "@/components/LoadModal";
-import { SaveModal } from "@/components/SaveModal";
-import { ToolHeader } from "@/components/ToolHeader";
-import { ToolActionButtons } from "@/components/ToolActionButtons";
-import { kvGet, kvSet, kvDelete, kvKeys } from "@/utils/db";
-import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { FileCode } from "lucide-react"
+import { LoadModal } from "@/components/LoadModal"
+import { SaveModal } from "@/components/SaveModal"
+import { ToolHeader } from "@/components/ToolHeader"
+import { ToolActionButtons } from "@/components/ToolActionButtons"
+import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor"
+import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { kvGet } from "@/utils/db"
+import { TOOL_REGISTRY } from "@/lib/tool-registry"
+import { toast } from "@heroui/react"
 
-type SavedNote = {
-  name: string;
-  content: string;
-  savedAt: number;
-};
+type NoteSaved = SavedItem & {
+  content: string
+}
+
+const STORAGE_PREFIX = TOOL_REGISTRY.notes.prefix!
 
 export default function NotesPage() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted text-sm">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="h-full flex items-center justify-center text-muted text-sm">加载中...</div>
+      }
+    >
       <NotesEditor />
     </Suspense>
-  );
+  )
 }
 
 function NotesEditor() {
-  const searchParams = useSearchParams();
-  const [content, setContent] = useState("");
-  const [dirty, setDirty] = useState(false);
-
-  // 当前加载的Markdown名称（用于覆盖保存）
-  const [currentName, setCurrentName] = useState<string | null>(null);
-
-  // 保存/加载 Modal
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [savedItems, setSavedItems] = useState<SavedNote[]>([]);
+  const searchParams = useSearchParams()
+  const [content, setContent] = useState("")
+  const resource = useResource<NoteSaved>(STORAGE_PREFIX)
 
   // URL 参数加载
   useEffect(() => {
-    const loadName = searchParams.get("load");
-    if (!loadName) return;
-    (async () => {
-      const item = await kvGet<SavedNote>(`notes:saved:${loadName}`);
-      if (item) {
-        setContent(item.content);
-        setCurrentName(item.name);
-        setDirty(false);
-      }
-    })();
-  }, [searchParams]);
+    const name = searchParams.get("load")
+    if (!name) return
+    void (async () => {
+      const item = await kvGet<NoteSaved>(STORAGE_PREFIX + name)
+      if (!item) return
+      setContent(item.content)
+      resource.load(item)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
-  // 加载已保存列表
-  const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys();
-    const items: SavedNote[] = [];
-    for (const key of keys) {
-      if (!key.startsWith("notes:saved:")) continue;
-      const item = await kvGet<SavedNote>(key);
-      if (item) items.push(item);
-    }
-    items.sort((a, b) => b.savedAt - a.savedAt);
-    setSavedItems(items);
-  }, []);
-
-  useEffect(() => {
-    if (loadModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadSavedList();
-    }
-  }, [loadModalOpen, loadSavedList]);
-
-  // 保存（有 currentName 则覆盖，否则新建）
   const handleSave = async () => {
-    // 如果已加载Markdown，直接覆盖，不弹 Modal
-    if (currentName) {
-      await kvSet(`notes:saved:${currentName}`, {
-        name: currentName,
-        content,
-        savedAt: Date.now(),
-      });
-      setDirty(false);
-      toast.success(`已保存「${currentName}」`);
-      return;
+    if (resource.currentName) {
+      const ok = await resource.overwrite({ content } as NoteSaved)
+      if (ok) toast.success(`已保存「${resource.currentName}」`)
+    } else {
+      resource.openSave()
     }
-    // 否则弹 Modal 让用户输入名称
-    setSaveName("");
-    setSaveModalOpen(true);
-  };
+  }
 
   const handleSaveConfirm = async () => {
-    const name = saveName.trim();
-    if (!name) return;
-    await kvSet(`notes:saved:${name}`, {
-      name,
-      content,
-      savedAt: Date.now(),
-    });
-    setCurrentName(name);
-    setSaveModalOpen(false);
-    setSaveName("");
-    setDirty(false);
-    toast.success(`已保存「${name}」`);
-  };
+    const name = await resource.save({ content } as NoteSaved)
+    if (name) toast.success(`已保存「${name}」`)
+  }
 
-  // 加载
-  const handleLoad = (item: SavedNote) => {
-    setContent(item.content);
-    setCurrentName(item.name);
-    setLoadModalOpen(false);
-    setDirty(false);
-  };
+  const handleLoad = (item: NoteSaved) => {
+    const loaded = resource.load(item)
+    setContent(loaded.content)
+  }
 
-  // 删除
-  const handleDelete = async (item: SavedNote) => {
-    await kvDelete(`notes:saved:${item.name}`);
-    if (currentName === item.name) setCurrentName(null);
-    loadSavedList();
-  };
-
-  // 另存为
-  const handleSaveAs = () => {
-    setSaveName(currentName || "");
-    setSaveModalOpen(true);
-  };
+  const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
@@ -135,45 +78,44 @@ function NotesEditor() {
         subtitle="富文本编辑 → 保存资源 → 统一管理"
         extra={
           <ToolActionButtons
-            currentName={currentName}
-            dirty={dirty}
-            onSave={handleSave}
-            onSaveAs={handleSaveAs}
-            onLoad={() => setLoadModalOpen(true)}
+            currentName={resource.currentName}
+            dirty={resource.dirty}
+            onSaveAction={handleSave}
+            onSaveAsAction={handleSaveAs}
+            onLoadAction={resource.openLoad}
           />
         }
       />
 
-      {/* 编辑器 */}
       <div className="flex-1 overflow-hidden">
         <SimpleEditor
           initialContent={content}
-          onUpdate={(html) => {
-            setContent(html);
-            setDirty(true);
+          onUpdateAction={(html) => {
+            setContent(html)
+            resource.setDirty(true)
           }}
         />
       </div>
 
       <SaveModal
-        isOpen={saveModalOpen}
-        onOpenChange={setSaveModalOpen}
-        title={currentName ? "另存为" : "保存Markdown"}
-        name={saveName}
-        onNameChange={setSaveName}
-        onSave={handleSaveConfirm}
+        isOpen={resource.saveOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeSave())}
+        title={resource.currentName ? "另存为" : "保存Markdown"}
+        name={resource.saveName}
+        onNameChangeAction={resource.setSaveName}
+        onSaveAction={handleSaveConfirm}
         placeholder="给这次保存起个名字"
       />
 
       <LoadModal
-        isOpen={loadModalOpen}
-        onOpenChange={setLoadModalOpen}
+        isOpen={resource.loadOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeLoad())}
         title="加载已保存的Markdown"
-        items={savedItems}
-        onLoad={handleLoad}
-        onDelete={handleDelete}
+        items={resource.items}
+        onLoadAction={handleLoad}
+        onDeleteAction={resource.remove}
         emptyText="暂无保存的Markdown"
       />
     </div>
-  );
+  )
 }

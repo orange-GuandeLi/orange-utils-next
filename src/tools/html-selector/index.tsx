@@ -1,50 +1,33 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import {
-  Button,
-  Chip,
-  Tooltip,
-  Input,
-  Label,
-  TextField,
-  toast,
-} from "@heroui/react";
-import {
-  SquareDashedMousePointer,
-  Copy,
-  Code2,
-  Eye,
-  GripVertical,
-  Check,
-} from "lucide-react";
-import { ToolHeader } from "../../components/ToolHeader";
-import { ToolActionButtons } from "../../components/ToolActionButtons";
-import { CodeEditor } from "./CodeEditor";
-import {
-  useIframeSelector,
-  type SelectionInfo,
-} from "./hooks/useIframeSelector";
-import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
-import { LoadModal } from "../../components/LoadModal";
-import { SaveModal } from "../../components/SaveModal";
-import { ModalShell } from "../../components/ModalShell";
+"use client"
 
-// 保存的数据结构
-type SavedItem = {
-  name: string;
-  html: string;
-  savedAt: number;
-};
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Button, Chip, Tooltip, toast } from "@heroui/react"
+import { Check, Code2, Copy, Eye, GripVertical, SquareDashedMousePointer } from "lucide-react"
+import { ToolHeader } from "@/components/ToolHeader"
+import { ToolActionButtons } from "@/components/ToolActionButtons"
+import { LoadModal } from "@/components/LoadModal"
+import { SaveModal } from "@/components/SaveModal"
+import { ModalShell } from "@/components/ModalShell"
+import { CodeEditor } from "./CodeEditor"
+import { useIframeSelector, type SelectionInfo } from "./hooks/useIframeSelector"
+import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { kvGet } from "@/utils/db"
+import { TOOL_REGISTRY } from "@/lib/tool-registry"
 
-const STORAGE_PREFIX = "html-selector:saved:";
+type HtmlSelectorSaved = SavedItem & {
+  html: string
+}
 
-// 可复制的信息项
+const STORAGE_PREFIX = TOOL_REGISTRY["html-selector"].prefix!
+
+// 复制信息项
 function CopyField({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
   const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
   return (
     <div className="flex items-start gap-3 py-2">
       <span className="text-xs text-muted w-20 shrink-0 pt-0.5">{label}</span>
@@ -60,209 +43,147 @@ function CopyField({ label, value }: { label: string; value: string }) {
           aria-label="复制"
           onPress={handleCopy}
         >
-          {copied ? (
-            <Check size={12} className="text-success" />
-          ) : (
-            <Copy size={12} />
-          )}
+          {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
         </Button>
         <Tooltip.Content>{copied ? "已复制" : "复制"}</Tooltip.Content>
       </Tooltip>
     </div>
-  );
+  )
 }
 
-export function HtmlSelector({
-  initialLoadName,
-}: {
-  initialLoadName?: string;
-}) {
-  const [html, setHtml] = useState(SAMPLE_HTML);
-  const [previewHtml, setPreviewHtml] = useState(SAMPLE_HTML);
-  const rafRef = useRef<number>(0);
+export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) {
+  const [html, setHtml] = useState(SAMPLE_HTML)
+  const [previewHtml, setPreviewHtml] = useState(SAMPLE_HTML)
+  const rafRef = useRef<number>(0)
 
   // 组件卸载时取消未执行的 RAF
-  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
 
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedInfo, setSelectedInfo] = useState<SelectionInfo | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [currentName, setCurrentName] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedInfo, setSelectedInfo] = useState<SelectionInfo | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // 分隔条
-  const [editorWidth, setEditorWidth] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [previewPx, setPreviewPx] = useState(0);
+  const [editorWidth, setEditorWidth] = useState(50)
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [previewPx, setPreviewPx] = useState(0)
 
-  // 保存/加载
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const resource = useResource<HtmlSelectorSaved>(STORAGE_PREFIX)
 
   const updatePreviewWidth = useCallback(() => {
-    if (!containerRef.current) return;
-    const containerW = containerRef.current.getBoundingClientRect().width;
-    const dividerW = 6;
-    setPreviewPx(Math.round(containerW * (1 - editorWidth / 100) - dividerW));
-  }, [editorWidth]);
+    if (!containerRef.current) return
+    const containerW = containerRef.current.getBoundingClientRect().width
+    const dividerW = 6
+    setPreviewPx(Math.round(containerW * (1 - editorWidth / 100) - dividerW))
+  }, [editorWidth])
 
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const setContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
+      if (resizeObserverRef.current) resizeObserverRef.current.disconnect()
       if (node) {
-        (
-          containerRef as React.MutableRefObject<HTMLDivElement | null>
-        ).current = node;
-        const ro = new ResizeObserver(() => updatePreviewWidth());
-        ro.observe(node);
-        resizeObserverRef.current = ro;
-        updatePreviewWidth();
+        containerRef.current = node
+        const ro = new ResizeObserver(() => updatePreviewWidth())
+        ro.observe(node)
+        resizeObserverRef.current = ro
+        updatePreviewWidth()
       }
     },
     [updatePreviewWidth],
-  );
+  )
 
   const handleSelected = useCallback((info: SelectionInfo) => {
-    setSelectedInfo(info);
-    setModalOpen(true);
-  }, []);
+    setSelectedInfo(info)
+    setModalOpen(true)
+  }, [])
 
   const handleExit = useCallback(() => {
-    setSelectMode(false);
-    setSelectedInfo(null);
-    setModalOpen(false);
-  }, []);
-
-  useEffect(() => {
-    if (!initialLoadName) return;
-    (async () => {
-      const item = await kvGet<SavedItem>(STORAGE_PREFIX + initialLoadName);
-      if (item) {
-        setHtml(item.html);
-        setPreviewHtml(item.html);
-        setCurrentName(item.name);
-        setDirty(false);
-        setSelectMode(false);
-        setSelectedInfo(null);
-        setModalOpen(false);
-      }
-    })();
-  }, [initialLoadName]);
+    setSelectMode(false)
+    setSelectedInfo(null)
+    setModalOpen(false)
+  }, [])
 
   useIframeSelector({
     iframeRef,
     selectMode,
     onSelected: handleSelected,
     onExit: handleExit,
-  });
+  })
 
-  // 加载已保存列表
-  const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys();
-    const items: SavedItem[] = [];
-    for (const key of keys) {
-      if (key.startsWith(STORAGE_PREFIX)) {
-        const item = await kvGet<SavedItem>(key);
-        if (item) items.push(item);
-      }
-    }
-    items.sort((a, b) => b.savedAt - a.savedAt);
-    setSavedItems(items);
-  }, []);
-
+  // URL 参数加载（仅执行一次）
   useEffect(() => {
-    if (loadModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadSavedList();
-    }
-  }, [loadModalOpen, loadSavedList]);
+    if (!initialLoadName) return
+    void (async () => {
+      const item = await kvGet<HtmlSelectorSaved>(STORAGE_PREFIX + initialLoadName)
+      if (!item) return
+      setHtml(item.html)
+      setPreviewHtml(item.html)
+      setSelectMode(false)
+      setSelectedInfo(null)
+      setModalOpen(false)
+      resource.load(item)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoadName])
 
-  // 保存
   const handleSave = async () => {
-    if (currentName) {
-      const item: SavedItem = { name: currentName, html, savedAt: Date.now() };
-      await kvSet(STORAGE_PREFIX + currentName, item);
-      setDirty(false);
-      toast.success(`已保存「${currentName}」`);
-      return;
+    if (resource.currentName) {
+      const ok = await resource.overwrite({ html } as HtmlSelectorSaved)
+      if (ok) toast.success(`已保存「${resource.currentName}」`)
+    } else {
+      resource.openSave()
     }
-    setSaveName("");
-    setSaveModalOpen(true);
-  };
+  }
 
   const handleSaveConfirm = async () => {
-    const name = saveName.trim();
-    if (!name) return;
-    const item: SavedItem = { name, html, savedAt: Date.now() };
-    await kvSet(STORAGE_PREFIX + name, item);
-    setCurrentName(name);
-    setSaveModalOpen(false);
-    setSaveName("");
-    setDirty(false);
-    toast.success(`已保存「${name}」`);
-  };
+    const name = await resource.save({ html } as HtmlSelectorSaved)
+    if (name) toast.success(`已保存「${name}」`)
+  }
 
-  const handleSaveAs = () => {
-    setSaveName(currentName || "");
-    setSaveModalOpen(true);
-  };
+  const handleLoad = (item: HtmlSelectorSaved) => {
+    const loaded = resource.load(item)
+    setHtml(loaded.html)
+    setPreviewHtml(loaded.html)
+    setSelectMode(false)
+    setSelectedInfo(null)
+    setModalOpen(false)
+  }
 
-  // 加载
-  const handleLoad = (item: SavedItem) => {
-    setHtml(item.html);
-    setPreviewHtml(item.html);
-    setCurrentName(item.name);
-    setDirty(false);
-    setSelectMode(false);
-    setSelectedInfo(null);
-    setModalOpen(false);
-    setLoadModalOpen(false);
-  };
-
-  // 删除
-  const handleDelete = async (item: SavedItem) => {
-    await kvDelete(STORAGE_PREFIX + item.name);
-    if (currentName === item.name) setCurrentName(null);
-    loadSavedList();
-  };
+  const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    document.body.style.pointerEvents = "none";
+    e.preventDefault()
+    setIsDragging(true)
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    document.body.style.pointerEvents = "none"
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const percent = ((e.clientX - rect.left) / rect.width) * 100;
-      setEditorWidth(Math.min(80, Math.max(20, percent)));
-      const dividerW = 6;
-      setPreviewPx(Math.round(rect.width * (1 - percent / 100) - dividerW));
-    };
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const percent = ((e.clientX - rect.left) / rect.width) * 100
+      setEditorWidth(Math.min(80, Math.max(20, percent)))
+      const dividerW = 6
+      setPreviewPx(Math.round(rect.width * (1 - percent / 100) - dividerW))
+    }
 
     const onMouseUp = () => {
-      setIsDragging(false);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      document.body.style.pointerEvents = "";
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
+      setIsDragging(false)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      document.body.style.pointerEvents = ""
+      document.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("mouseup", onMouseUp)
+    }
 
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, []);
+    document.addEventListener("mousemove", onMouseMove)
+    document.addEventListener("mouseup", onMouseUp)
+  }, [])
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
-      {/* Header */}
       <ToolHeader
         icon={Code2}
         title="HTML 选择器"
@@ -270,39 +191,33 @@ export function HtmlSelector({
         extra={
           <>
             <ToolActionButtons
-              currentName={currentName}
-              dirty={dirty}
-              onSave={handleSave}
-              onSaveAs={handleSaveAs}
-              onLoad={() => setLoadModalOpen(true)}
+              currentName={resource.currentName}
+              dirty={resource.dirty}
+              onSaveAction={handleSave}
+              onSaveAsAction={handleSaveAs}
+              onLoadAction={resource.openLoad}
             />
-            <Chip
-              size="sm"
-              variant="soft"
-              color="default"
-              className="font-mono"
-            >
+            <Chip size="sm" variant="soft" color="default" className="font-mono">
               <Chip.Label>{previewPx}px</Chip.Label>
             </Chip>
           </>
         }
       />
 
-      {/* Tool-specific controls */}
       <div className="flex items-center gap-2 px-5 py-2 border-b border-separator shrink-0 justify-end">
         <Button
           size="sm"
           className="text-xs"
           variant={selectMode ? "danger" : "primary"}
           onPress={(e) => {
-            (e.target as HTMLElement)?.blur?.();
+            ;(e.target as HTMLElement)?.blur?.()
             if (selectMode) {
-              setSelectMode(false);
-              setSelectedInfo(null);
-              setModalOpen(false);
+              setSelectMode(false)
+              setSelectedInfo(null)
+              setModalOpen(false)
             } else {
-              setSelectMode(true);
-              setSelectedInfo(null);
+              setSelectMode(true)
+              setSelectedInfo(null)
             }
           }}
         >
@@ -330,11 +245,7 @@ export function HtmlSelector({
         )}
       </div>
 
-      {/* Main */}
-      <div
-        ref={setContainerRef}
-        className="flex-1 flex min-h-0 relative select-none"
-      >
+      <div ref={setContainerRef} className="flex-1 flex min-h-0 relative select-none">
         <div
           className="border-r border-separator flex flex-col shrink-0 overflow-hidden"
           style={{ width: `${editorWidth}%` }}
@@ -347,16 +258,16 @@ export function HtmlSelector({
             <CodeEditor
               value={html}
               onChange={(v) => {
-                setHtml(v);
-                setDirty(true);
-                setSelectMode(false);
-                setSelectedInfo(null);
-                setModalOpen(false);
+                setHtml(v)
+                resource.setDirty(true)
+                setSelectMode(false)
+                setSelectedInfo(null)
+                setModalOpen(false)
                 // RAF 节流：预览跟随浏览器刷新率更新
-                cancelAnimationFrame(rafRef.current);
+                cancelAnimationFrame(rafRef.current)
                 rafRef.current = requestAnimationFrame(() => {
-                  setPreviewHtml(v);
-                });
+                  setPreviewHtml(v)
+                })
               }}
             />
           </div>
@@ -381,12 +292,7 @@ export function HtmlSelector({
             />
             {selectMode && !selectedInfo && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-                <Chip
-                  size="lg"
-                  variant="primary"
-                  color="danger"
-                  className="animate-pulse"
-                >
+                <Chip size="lg" variant="primary" color="danger" className="animate-pulse">
                   <Chip.Label>点击页面中的元素进行选择</Chip.Label>
                 </Chip>
               </div>
@@ -395,11 +301,10 @@ export function HtmlSelector({
         </div>
       </div>
 
-      {/* 选中信息 Modal */}
       {selectedInfo && (
         <ModalShell
           isOpen={modalOpen}
-          onOpenChange={setModalOpen}
+          onOpenChangeAction={setModalOpen}
           title="选中元素信息"
           icon={Eye}
           width="sm:max-w-lg"
@@ -420,10 +325,7 @@ export function HtmlSelector({
             {selectedInfo.editableType && (
               <>
                 <CopyField label="可编辑" value={selectedInfo.editableType} />
-                <CopyField
-                  label="值"
-                  value={selectedInfo.editableValue || ""}
-                />
+                <CopyField label="值" value={selectedInfo.editableValue || ""} />
               </>
             )}
             <CopyField label="文本" value={selectedInfo.textContent} />
@@ -433,26 +335,26 @@ export function HtmlSelector({
       )}
 
       <SaveModal
-        isOpen={saveModalOpen}
-        onOpenChange={setSaveModalOpen}
-        title={currentName ? "另存为" : "保存代码"}
-        name={saveName}
-        onNameChange={setSaveName}
-        onSave={handleSaveConfirm}
+        isOpen={resource.saveOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeSave())}
+        title={resource.currentName ? "另存为" : "保存代码"}
+        name={resource.saveName}
+        onNameChangeAction={resource.setSaveName}
+        onSaveAction={handleSaveConfirm}
         placeholder="给这次保存起个名字"
       />
 
       <LoadModal
-        isOpen={loadModalOpen}
-        onOpenChange={setLoadModalOpen}
+        isOpen={resource.loadOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeLoad())}
         title="加载已保存的代码"
-        items={savedItems}
-        onLoad={handleLoad}
-        onDelete={handleDelete}
+        items={resource.items}
+        onLoadAction={handleLoad}
+        onDeleteAction={resource.remove}
         emptyText="暂无保存的代码"
       />
     </div>
-  );
+  )
 }
 
 const SAMPLE_HTML = `<!DOCTYPE html>
@@ -494,4 +396,4 @@ const SAMPLE_HTML = `<!DOCTYPE html>
     <p>© 2026 示例页面</p>
   </div>
 </body>
-</html>`;
+</html>`

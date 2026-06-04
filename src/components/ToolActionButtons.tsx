@@ -1,29 +1,29 @@
-"use client";
+"use client"
 
-import { Button, Tooltip, Chip } from "@heroui/react";
-import { Save, FolderOpen, FileDown } from "lucide-react";
+import { Button, Tooltip, Chip } from "@heroui/react"
+import { Save, FolderOpen, FileDown } from "lucide-react"
 
 type ToolActionButtonsProps = {
   /** 当前加载的资源名称 */
-  currentName: string | null;
+  currentName: string | null
   /** 是否有未保存的修改 */
-  dirty: boolean;
+  dirty: boolean
   /** 保存（有 currentName 覆盖，没有则弹 Modal） */
-  onSave: () => void;
+  onSaveAction: () => void
   /** 另存为 */
-  onSaveAs: () => void;
+  onSaveAsAction: () => void
   /** 加载 */
-  onLoad: () => void;
+  onLoadAction: () => void
   /** 保存按钮提示文本 */
-  saveTooltip?: string;
-};
+  saveTooltip?: string
+}
 
 export function ToolActionButtons({
   currentName,
   dirty,
-  onSave,
-  onSaveAs,
-  onLoad,
+  onSaveAction: onSave,
+  onSaveAsAction: onSaveAs,
+  onLoadAction: onLoad,
   saveTooltip,
 }: ToolActionButtonsProps) {
   return (
@@ -44,7 +44,9 @@ export function ToolActionButtons({
             <Save size={14} />
           </Button>
         </Tooltip.Trigger>
-        <Tooltip.Content>{saveTooltip || (currentName ? `覆盖保存「${currentName}」` : "保存")}</Tooltip.Content>
+        <Tooltip.Content>
+          {saveTooltip || (currentName ? `覆盖保存「${currentName}」` : "保存")}
+        </Tooltip.Content>
       </Tooltip>
       {currentName && (
         <Tooltip delay={0}>
@@ -65,5 +67,5 @@ export function ToolActionButtons({
         <Tooltip.Content>加载</Tooltip.Content>
       </Tooltip>
     </>
-  );
+  )
 }

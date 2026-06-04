@@ -1,194 +1,237 @@
-import { useState, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Input, Label, TextField, Select, ListBox, Tabs, toast } from "@heroui/react";
-import { Send, Save, FolderOpen, Trash2, Plus, X, Copy, Check, FileDown } from "lucide-react";
-import { ToolHeader } from "../../components/ToolHeader";
-import { ToolActionButtons } from "../../components/ToolActionButtons";
-import { LoadModal } from "../../components/LoadModal";
-import { SaveModal } from "../../components/SaveModal";
-import { kvGet, kvSet, kvDelete, kvKeys } from "../../utils/db";
-import { ModalShell } from "../../components/ModalShell";
-import { CodeEditor } from "../../components/CodeEditor";
+"use client"
 
-type Header = { key: string; value: string };
-type RequestConfig = { name: string; method: string; url: string; headers: Header[]; body: string; savedAt: number };
-type ResponseData = { status: number; statusText: string; headers: Record<string, string>; body: string; time: number };
+import { useCallback, useEffect, useState } from "react"
+import { Button, Chip, Input, ListBox, Select, Tabs, Tooltip, toast } from "@heroui/react"
+import { Check, Copy, Plus, Send, X } from "lucide-react"
+import { ToolHeader } from "@/components/ToolHeader"
+import { ToolActionButtons } from "@/components/ToolActionButtons"
+import { LoadModal } from "@/components/LoadModal"
+import { SaveModal } from "@/components/SaveModal"
+import { ModalShell } from "@/components/ModalShell"
+import { CodeEditor } from "@/components/CodeEditor"
+import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { kvGet, kvKeys } from "@/utils/db"
+import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
 
-const STORAGE_PREFIX = "api-request:saved:";
-const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+type Header = { key: string; value: string }
+
+type RequestConfig = SavedItem & {
+  method: string
+  url: string
+  headers: Header[]
+  body: string
+}
+
+type ResponseData = {
+  status: number
+  statusText: string
+  headers: Record<string, string>
+  body: string
+  time: number
+}
+
+const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const
+type Method = (typeof METHODS)[number]
+
+const STORAGE_PREFIX = TOOL_REGISTRY["api-request"].prefix!
 
 export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
-  const [method, setMethod] = useState("GET");
-  const [url, setUrl] = useState("");
-  const [headers, setHeaders] = useState<Header[]>([{ key: "Content-Type", value: "application/json" }]);
-  const [body, setBody] = useState("");
-  const [response, setResponse] = useState<ResponseData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [method, setMethod] = useState<Method>("GET")
+  const [url, setUrl] = useState("")
+  const [headers, setHeaders] = useState<Header[]>([
+    { key: "Content-Type", value: "application/json" },
+  ])
+  const [body, setBody] = useState("")
+  const [response, setResponse] = useState<ResponseData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [savedItems, setSavedItems] = useState<RequestConfig[]>([]);
-  const [currentName, setCurrentName] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const resource = useResource<RequestConfig>(STORAGE_PREFIX)
 
-  const [varModalOpen, setVarModalOpen] = useState(false);
-  const [availableVars, setAvailableVars] = useState<{ id: string; name: string; toolName: string; varKey: string; savedAt: number }[]>([]);
+  const [varModalOpen, setVarModalOpen] = useState(false)
+  const [availableVars, setAvailableVars] = useState<
+    { id: string; name: string; toolName: string; varKey: string; savedAt: number }[]
+  >([])
 
-  const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys();
-    const items: RequestConfig[] = [];
-    for (const key of keys) {
-      if (key.startsWith(STORAGE_PREFIX)) {
-        const item = await kvGet<RequestConfig>(key);
-        if (item) items.push(item);
-      }
-    }
-    items.sort((a, b) => b.savedAt - a.savedAt);
-    setSavedItems(items);
-  }, []);
-
-  useEffect(() => {
-    if (loadModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadSavedList();
-    }
-  }, [loadModalOpen, loadSavedList]);
-
-  const TOOL_NAMES: Record<string, string> = {
-    "html-selector": "HTML 选择器",
-    "api-request": "API 请求",
-    "regex": "正则测试",
-    "notes": "Markdown",
-    "manual": "手动创建",
-  };
+  const buildConfig = useCallback(
+    (): Omit<RequestConfig, "name" | "savedAt"> => ({
+      method,
+      url,
+      headers,
+      body,
+    }),
+    [method, url, headers, body],
+  )
 
   const loadAvailableVars = useCallback(async () => {
-    const keys = await kvKeys();
-    const vars: { id: string; name: string; toolName: string; varKey: string; savedAt: number }[] = [];
+    const keys = await kvKeys()
+    const rows: {
+      id: string
+      name: string
+      toolName: string
+      varKey: string
+      savedAt: number
+    }[] = []
     for (const key of keys) {
-      if (!key.includes(":saved:")) continue;
-      const item = await kvGet<Record<string, unknown>>(key);
-      if (!item) continue;
-      const name = (item.name as string) || key.replace(/^.*?:saved:/, "");
-      const savedAt = (item.savedAt as number) || 0;
-      const toolPrefix = key.split(":")[0];
-      const toolName = TOOL_NAMES[toolPrefix] || toolPrefix;
-      // 为每个字段生成变量 key
-      const fields = ["html", "content", "body", "testString"];
+      if (!key.includes(":saved:")) continue
+      const item = await kvGet<Record<string, unknown>>(key)
+      if (!item) continue
+      const name = (item.name as string) || key.replace(/^.*?:saved:/, "")
+      const savedAt = (item.savedAt as number) || 0
+      const toolPrefix = key.split(":")[0]
+      const toolName = TOOL_NAME_LABELS[toolPrefix] || toolPrefix
+      const fields = ["html", "content", "body", "testString"] as const
       for (const field of fields) {
         if (item[field]) {
-          vars.push({ id: `${key}.${field}`, name, toolName, varKey: `{{${key}.${field}}}`, savedAt });
-          break; // 只取第一个有值的字段
+          rows.push({
+            id: `${key}.${field}`,
+            name,
+            toolName,
+            varKey: `{{${key}.${field}}}`,
+            savedAt,
+          })
+          break
         }
       }
     }
-    vars.sort((a, b) => b.savedAt - a.savedAt);
-    setAvailableVars(vars);
-  }, []);
+    rows.sort((a, b) => b.savedAt - a.savedAt)
+    setAvailableVars(rows)
+  }, [])
 
+  // URL 参数加载（仅执行一次）
   useEffect(() => {
-    if (varModalOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadAvailableVars();
-    }
-  }, [varModalOpen, loadAvailableVars]);
+    if (!initialLoadName) return
+    void (async () => {
+      const item = await kvGet<RequestConfig>(STORAGE_PREFIX + initialLoadName)
+      if (!item) return
+      setMethod(item.method as Method)
+      setUrl(item.url)
+      setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }])
+      setBody(item.body)
+      resource.load(item)
+    })()
+    // resource 是稳定对象，但此处只想依赖 initialLoadName
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoadName])
 
   const resolveVars = useCallback(async (text: string): Promise<string> => {
-    const pattern = /\{\{([^}]+)\}\}/g;
-    let result = text;
-    let match;
+    const pattern = /\{\{([^}]+)\}\}/g
+    let result = text
+    let match: RegExpExecArray | null
+    pattern.lastIndex = 0
     while ((match = pattern.exec(text)) !== null) {
-      const value = await kvGet<string>(match[1]);
-      if (value !== undefined) result = result.replace(match[0], typeof value === "string" ? value : JSON.stringify(value));
+      const value = await kvGet<string>(match[1])
+      if (value !== undefined) {
+        result = result.replace(match[0], typeof value === "string" ? value : JSON.stringify(value))
+      }
     }
-    return result;
-  }, []);
+    return result
+  }, [])
 
   const handleSend = async () => {
-    if (!url.trim()) { setError("请输入 URL"); return; }
-    setLoading(true); setError(""); setResponse(null);
+    if (!url.trim()) {
+      setError("请输入 URL")
+      return
+    }
+    setLoading(true)
+    setError("")
+    setResponse(null)
     try {
-      const resolvedUrl = await resolveVars(url);
-      const resolvedBody = await resolveVars(body);
-      const fetchHeaders: Record<string, string> = {};
-      for (const h of headers) { if (h.key.trim()) fetchHeaders[h.key.trim()] = await resolveVars(h.value); }
-      const start = Date.now();
-      const res = await fetch(resolvedUrl, { method, headers: fetchHeaders, body: method !== "GET" ? resolvedBody : undefined });
-      const time = Date.now() - start;
-      const resHeaders: Record<string, string> = {};
-      res.headers.forEach((v, k) => { resHeaders[k] = v; });
-      let resBody = await res.text();
-      try { resBody = JSON.stringify(JSON.parse(resBody), null, 2); } catch { /* not JSON */ }
-      setResponse({ status: res.status, statusText: res.statusText, headers: resHeaders, body: resBody, time });
+      const resolvedUrl = await resolveVars(url)
+      const resolvedBody = await resolveVars(body)
+      const fetchHeaders: Record<string, string> = {}
+      for (const h of headers) {
+        if (h.key.trim()) {
+          fetchHeaders[h.key.trim()] = await resolveVars(h.value)
+        }
+      }
+      const start = Date.now()
+      const res = await fetch(resolvedUrl, {
+        method,
+        headers: fetchHeaders,
+        body: method !== "GET" ? resolvedBody : undefined,
+      })
+      const time = Date.now() - start
+      const resHeaders: Record<string, string> = {}
+      res.headers.forEach((v, k) => {
+        resHeaders[k] = v
+      })
+      let resBody = await res.text()
+      try {
+        resBody = JSON.stringify(JSON.parse(resBody), null, 2)
+      } catch {
+        /* not JSON */
+      }
+      setResponse({
+        status: res.status,
+        statusText: res.statusText,
+        headers: resHeaders,
+        body: resBody,
+        time,
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "请求失败");
-    } finally { setLoading(false); }
-  };
+      setError(err instanceof Error ? err.message : "请求失败")
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const addHeader = () => { setHeaders([...headers, { key: "", value: "" }]); setDirty(true); };
-  const removeHeader = (i: number) => { setHeaders(headers.filter((_, idx) => idx !== i)); setDirty(true); };
+  const addHeader = () => {
+    setHeaders([...headers, { key: "", value: "" }])
+    resource.setDirty(true)
+  }
+  const removeHeader = (i: number) => {
+    setHeaders(headers.filter((_, idx) => idx !== i))
+    resource.setDirty(true)
+  }
   const updateHeader = (i: number, field: "key" | "value", val: string) => {
-    const next = [...headers]; next[i] = { ...next[i], [field]: val }; setHeaders(next); setDirty(true);
-  };
+    const next = [...headers]
+    next[i] = { ...next[i], [field]: val }
+    setHeaders(next)
+    resource.setDirty(true)
+  }
 
   const handleSave = async () => {
-    if (currentName) {
-      await kvSet(STORAGE_PREFIX + currentName, { name: currentName, method, url, headers, body, savedAt: Date.now() });
-      setDirty(false);
-      toast.success(`已保存「${currentName}」`);
-      return;
+    if (resource.currentName) {
+      const ok = await resource.overwrite(buildConfig() as RequestConfig)
+      if (ok) toast.success(`已保存「${resource.currentName}」`)
+    } else {
+      resource.openSave()
     }
-    setSaveName("");
-    setSaveModalOpen(true);
-  };
+  }
 
   const handleSaveConfirm = async () => {
-    const name = saveName.trim();
-    if (!name) return;
-    await kvSet(STORAGE_PREFIX + name, { name, method, url, headers, body, savedAt: Date.now() });
-    setCurrentName(name);
-    setSaveModalOpen(false); setSaveName("");
-    setDirty(false);
-    toast.success(`已保存「${name}」`);
-  };
+    const name = await resource.save(buildConfig() as RequestConfig)
+    if (name) toast.success(`已保存「${name}」`)
+  }
 
   const handleLoad = (item: RequestConfig) => {
-    setMethod(item.method); setUrl(item.url);
-    setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }]);
-    setBody(item.body);
-    setCurrentName(item.name);
-    setDirty(false);
-    setLoadModalOpen(false);
-  };
+    const loaded = resource.load(item)
+    setMethod(loaded.method as Method)
+    setUrl(loaded.url)
+    setHeaders(loaded.headers.length ? loaded.headers : [{ key: "", value: "" }])
+    setBody(loaded.body)
+  }
 
-  const handleDelete = async (item: RequestConfig) => { await kvDelete(STORAGE_PREFIX + item.name); if (currentName === item.name) setCurrentName(null); loadSavedList(); };
+  const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
-  const handleSaveAs = () => { setSaveName(currentName || ""); setSaveModalOpen(true); };
-
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
   const handleCopyResponse = () => {
-    if (!response) return;
-    navigator.clipboard.writeText(response.body);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
-  };
+    if (!response) return
+    navigator.clipboard.writeText(response.body)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
-  useEffect(() => {
-    if (!initialLoadName) return;
-    (async () => {
-      const item = await kvGet<RequestConfig>(STORAGE_PREFIX + initialLoadName);
-      if (item) {
-        setMethod(item.method);
-        setUrl(item.url);
-        setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }]);
-        setBody(item.body);
-        setCurrentName(item.name);
-        setDirty(false);
-      }
-    })();
-  }, [initialLoadName]);
+  const insertVar = (varKey: string) => {
+    setBody((prev) => prev + varKey)
+    setVarModalOpen(false)
+  }
 
-  const insertVar = (varKey: string) => { setBody((prev) => prev + varKey); setVarModalOpen(false); };
+  const openVarModal = () => {
+    void loadAvailableVars()
+    setVarModalOpen(true)
+  }
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
@@ -198,12 +241,12 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
         subtitle="发送 HTTP 请求，支持模板变量引用其他工具的数据"
         extra={
           <ToolActionButtons
-            currentName={currentName}
-            dirty={dirty}
-            onSave={handleSave}
-            onSaveAs={handleSaveAs}
-            onLoad={() => setLoadModalOpen(true)}
-            saveTooltip={currentName ? `保存到 ${currentName}` : "保存请求"}
+            currentName={resource.currentName}
+            dirty={resource.dirty}
+            onSaveAction={handleSave}
+            onSaveAsAction={handleSaveAs}
+            onLoadAction={resource.openLoad}
+            saveTooltip={resource.currentName ? `保存到 ${resource.currentName}` : "保存请求"}
           />
         }
       />
@@ -212,27 +255,61 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* 左: 请求配置 */}
         <div className="w-1/2 border-r border-separator flex flex-col overflow-hidden">
-          {/* URL 行 */}
           <div className="flex items-center gap-2 p-3 border-b border-separator shrink-0">
-            <Select className="w-28" placeholder="GET" selectedKey={method} onSelectionChange={(key) => { if (key) { setMethod(key as string); setDirty(true); } }}>
-              <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
+            <Select
+              className="w-28"
+              placeholder="GET"
+              selectedKey={method}
+              onSelectionChange={(key) => {
+                if (key) {
+                  setMethod(key as Method)
+                  resource.setDirty(true)
+                }
+              }}
+            >
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
               <Select.Popover>
                 <ListBox>
-                  {METHODS.map((m) => (<ListBox.Item key={m} id={m} textValue={m}>{m}<ListBox.ItemIndicator /></ListBox.Item>))}
+                  {METHODS.map((m) => (
+                    <ListBox.Item key={m} id={m} textValue={m}>
+                      {m}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
                 </ListBox>
               </Select.Popover>
             </Select>
-            <Input className="flex-1" placeholder="https://api.example.com/endpoint" value={url} onChange={(e) => { setUrl((e.target as HTMLInputElement).value); setDirty(true); }} />
-            <Button size="sm" className="text-xs" variant="primary" onPress={handleSend} isDisabled={loading}>
-              <Send size={14} />{loading ? "发送中..." : "发送"}
+            <Input
+              className="flex-1"
+              placeholder="https://api.example.com/endpoint"
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                resource.setDirty(true)
+              }}
+            />
+            <Button
+              size="sm"
+              className="text-xs"
+              variant="primary"
+              onPress={handleSend}
+              isDisabled={loading}
+            >
+              <Send size={14} />
+              {loading ? "发送中..." : "发送"}
             </Button>
           </div>
 
-          {/* Tabs */}
           <Tabs className="flex-1 min-h-0" defaultSelectedKey="body">
             <Tabs.ListContainer>
               <Tabs.List aria-label="请求配置">
-                <Tabs.Tab id="body" className="text-xs">请求体<Tabs.Indicator /></Tabs.Tab>
+                <Tabs.Tab id="body" className="text-xs">
+                  请求体
+                  <Tabs.Indicator />
+                </Tabs.Tab>
                 <Tabs.Tab id="headers" className="text-xs">
                   请求头
                   {headers.filter((h) => h.key.trim()).length > 0 && (
@@ -249,33 +326,66 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-separator bg-surface-secondary shrink-0">
                 <span className="text-xs text-muted">JSON 请求体</span>
                 <Tooltip delay={0}>
-                  <Button size="sm" variant="ghost" onPress={() => setVarModalOpen(true)}>
-                    <Plus size={12} /><span className="text-xs">插入变量</span>
+                  <Button size="sm" variant="ghost" onPress={openVarModal}>
+                    <Plus size={12} />
+                    <span className="text-xs">插入变量</span>
                   </Button>
                   <Tooltip.Content>从其他工具插入数据</Tooltip.Content>
                 </Tooltip>
               </div>
               <div className="flex-1 min-h-0">
-                <CodeEditor value={body} onChange={(v) => { setBody(v); setDirty(true); }} language="json" />
+                <CodeEditor
+                  value={body}
+                  onChange={(v) => {
+                    setBody(v)
+                    resource.setDirty(true)
+                  }}
+                  language="json"
+                />
               </div>
             </Tabs.Panel>
 
             <Tabs.Panel id="headers" className="p-3 space-y-2 overflow-y-auto mt-0">
               {headers.map((h, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <Input className="flex-1" placeholder="键" value={h.key} onChange={(e) => updateHeader(i, "key", (e.target as HTMLInputElement).value)} />
-                  <Input className="flex-1" placeholder="值" value={h.value} onChange={(e) => updateHeader(i, "value", (e.target as HTMLInputElement).value)} />
+                  <Input
+                    className="flex-1"
+                    placeholder="键"
+                    value={h.key}
+                    onChange={(e) => updateHeader(i, "key", e.target.value)}
+                  />
+                  <Input
+                    className="flex-1"
+                    placeholder="值"
+                    value={h.value}
+                    onChange={(e) => updateHeader(i, "value", e.target.value)}
+                  />
                   <Tooltip delay={0}>
-                    <Button isIconOnly size="sm" variant="ghost" aria-label="删除请求头" onPress={() => removeHeader(i)}><X size={12} /></Button>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      aria-label="删除请求头"
+                      onPress={() => removeHeader(i)}
+                    >
+                      <X size={12} />
+                    </Button>
                     <Tooltip.Content>删除</Tooltip.Content>
                   </Tooltip>
                 </div>
               ))}
-              <Button size="sm" variant="ghost" onPress={addHeader}><Plus size={12} /><span className="text-xs">添加请求头</span></Button>
+              <Button size="sm" variant="ghost" onPress={addHeader}>
+                <Plus size={12} />
+                <span className="text-xs">添加请求头</span>
+              </Button>
             </Tabs.Panel>
           </Tabs>
 
-          {error && <div className="px-3 py-2 bg-danger-soft text-danger text-xs border-t border-separator shrink-0">{error}</div>}
+          {error && (
+            <div className="px-3 py-2 bg-danger-soft text-danger text-xs border-t border-separator shrink-0">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* 右: 响应 */}
@@ -285,11 +395,21 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
             {response && (
               <div className="flex items-center gap-2">
                 <Chip size="sm" variant="soft" color={response.status < 400 ? "success" : "danger"}>
-                  <Chip.Label>{response.status} {response.statusText}</Chip.Label>
+                  <Chip.Label>
+                    {response.status} {response.statusText}
+                  </Chip.Label>
                 </Chip>
-                <Chip size="sm" variant="soft" color="default"><Chip.Label>{response.time}ms</Chip.Label></Chip>
+                <Chip size="sm" variant="soft" color="default">
+                  <Chip.Label>{response.time}ms</Chip.Label>
+                </Chip>
                 <Tooltip delay={0}>
-                  <Button isIconOnly size="sm" variant="ghost" aria-label="复制响应" onPress={handleCopyResponse}>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label="复制响应"
+                    onPress={handleCopyResponse}
+                  >
                     {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
                   </Button>
                   <Tooltip.Content>{copied ? "已复制" : "复制响应"}</Tooltip.Content>
@@ -310,38 +430,41 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
       </div>
 
       <SaveModal
-        isOpen={saveModalOpen}
-        onOpenChange={setSaveModalOpen}
-        title={currentName ? "另存为" : "保存请求"}
-        name={saveName}
-        onNameChange={setSaveName}
-        onSave={handleSaveConfirm}
+        isOpen={resource.saveOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeSave())}
+        title={resource.currentName ? "另存为" : "保存请求"}
+        name={resource.saveName}
+        onNameChangeAction={resource.setSaveName}
+        onSaveAction={handleSaveConfirm}
         placeholder="给这个请求起个名字"
       />
 
       <LoadModal
-        isOpen={loadModalOpen}
-        onOpenChange={setLoadModalOpen}
+        isOpen={resource.loadOpen}
+        onOpenChangeAction={(o) => (o ? null : resource.closeLoad())}
         title="加载已保存的请求"
-        items={savedItems}
-        onLoad={handleLoad}
-        onDelete={handleDelete}
+        items={resource.items}
+        onLoadAction={handleLoad}
+        onDeleteAction={resource.remove}
         emptyText="暂无保存的请求"
-        renderMeta={(item) => (
-          <span className="text-xs font-mono text-muted">{item.method} {item.url}</span>
+        renderMetaAction={(item) => (
+          <span className="text-xs font-mono text-muted">
+            {item.method} {item.url}
+          </span>
         )}
       />
 
-      {/* 插入变量 Modal */}
       <ModalShell
         isOpen={varModalOpen}
-        onOpenChange={setVarModalOpen}
+        onOpenChangeAction={setVarModalOpen}
         title="插入变量"
         icon={Plus}
       >
         <p className="text-xs text-muted mb-3">从其他工具的数据中选择变量，插入到请求 Body 中。</p>
         {availableVars.length === 0 ? (
-          <p className="text-sm text-muted text-center py-4">暂无可用变量，请先在其他工具中保存数据</p>
+          <p className="text-sm text-muted text-center py-4">
+            暂无可用变量，请先在其他工具中保存数据
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {availableVars.map((v) => (
@@ -367,5 +490,5 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
         )}
       </ModalShell>
     </div>
-  );
+  )
 }

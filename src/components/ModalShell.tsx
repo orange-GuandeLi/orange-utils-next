@@ -1,21 +1,21 @@
-"use client";
+"use client"
 
-import { ReactNode } from "react";
-import { Button, Modal } from "@heroui/react";
-import { LucideIcon } from "lucide-react";
+import { ReactNode } from "react"
+import { Modal } from "@heroui/react"
+import { LucideIcon } from "lucide-react"
 
 type ModalShellProps = {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  icon: LucideIcon;
-  children: ReactNode;
-  width?: string;
-};
+  isOpen: boolean
+  onOpenChangeAction: (open: boolean) => void
+  title: string
+  icon: LucideIcon
+  children: ReactNode
+  width?: string
+}
 
 export function ModalShell({
   isOpen,
-  onOpenChange,
+  onOpenChangeAction: onOpenChange,
   title,
   icon: Icon,
   children,
@@ -32,11 +32,9 @@ export function ModalShell({
             </Modal.Icon>
             <Modal.Heading>{title}</Modal.Heading>
           </Modal.Header>
-          <Modal.Body>
-            {children}
-          </Modal.Body>
+          <Modal.Body>{children}</Modal.Body>
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>
-  );
+  )
 }

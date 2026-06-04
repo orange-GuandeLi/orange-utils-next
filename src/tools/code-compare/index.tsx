@@ -1,87 +1,87 @@
-import { useState, useCallback, useEffect } from "react";
-import { Button, Chip, Tooltip, Select, ListBox } from "@heroui/react";
-import { GitCompareArrows, FolderOpen } from "lucide-react";
-import { DiffView } from "./DiffView";
-import { kvGet, kvKeys } from "../../utils/db";
-import { LoadModal } from "../../components/LoadModal";
-import { ToolHeader } from "../../components/ToolHeader";
+"use client"
 
-type LoadTarget = "left" | "right";
+import { useCallback, useState } from "react"
+import { Button, Chip, ListBox, Select, Tooltip } from "@heroui/react"
+import { FolderOpen, GitCompareArrows } from "lucide-react"
+import { DiffView } from "./DiffView"
+import { kvGet, kvKeys } from "@/utils/db"
+import { LoadModal } from "@/components/LoadModal"
+import { ToolHeader } from "@/components/ToolHeader"
+import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
+
+type LoadTarget = "left" | "right"
 
 type SavedItem = {
-  id: string;
-  name: string;
-  toolName: string;
-  savedAt: number;
-  content: string;
-};
+  id: string
+  name: string
+  toolName: string
+  savedAt: number
+  content: string
+}
 
 const LANGUAGES = [
   { id: "html", name: "HTML" },
   { id: "json", name: "JSON" },
   { id: "text", name: "纯文本" },
-];
+] as const
 
-const TOOL_LABELS: Record<string, string> = {
-  "html-selector": "HTML 选择器",
-  "api-request": "API 请求",
-  "regex-tester": "正则测试",
-  "markdown": "Markdown",
-};
+const CATEGORY_BY_KEY = (key: string) => {
+  for (const tool of Object.values(TOOL_REGISTRY)) {
+    if (tool.prefix && key.startsWith(tool.prefix)) return tool
+  }
+  return null
+}
 
 export function CodeCompare() {
-  const [leftCode, setLeftCode] = useState("");
-  const [rightCode, setRightCode] = useState("");
-  const [language, setLanguage] = useState("html");
+  const [leftCode, setLeftCode] = useState("")
+  const [rightCode, setRightCode] = useState("")
+  const [language, setLanguage] = useState<(typeof LANGUAGES)[number]["id"]>("html")
 
-  // 加载面板
-  const [loadTarget, setLoadTarget] = useState<LoadTarget | null>(null);
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const [loadTarget, setLoadTarget] = useState<LoadTarget | null>(null)
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([])
 
   const loadSavedList = useCallback(async () => {
-    const keys = await kvKeys();
-    const items: SavedItem[] = [];
+    const keys = await kvKeys()
+    const items: SavedItem[] = []
     for (const key of keys) {
-      if (!key.includes(":saved:")) continue;
-      const item = await kvGet<Record<string, unknown>>(key);
-      if (!item) continue;
-      const raw = item as { name?: string; savedAt?: number };
+      if (!key.includes(":saved:")) continue
+      const item = await kvGet<Record<string, unknown>>(key)
+      if (!item) continue
+      const tool = CATEGORY_BY_KEY(key)
       const content =
-        (item as { html?: string }).html ||
-        (item as { body?: string }).body ||
-        JSON.stringify(item, null, 2);
-      const toolId = key.split(":saved:")[0] || "";
+        (item.html as string) ||
+        (item.content as string) ||
+        (item.body as string) ||
+        (item.testString as string) ||
+        JSON.stringify(item, null, 2)
       items.push({
         id: key,
-        name: raw.name || key.replace(/^.*?:saved:/, ""),
-        toolName: TOOL_LABELS[toolId] || toolId,
-        savedAt: raw.savedAt || 0,
+        name: (item.name as string) || key.replace(/^.*?:saved:/, ""),
+        toolName: tool ? TOOL_NAME_LABELS[tool.id] || tool.name : "其他",
+        savedAt: (item.savedAt as number) || 0,
         content,
-      });
+      })
     }
-    items.sort((a, b) => b.savedAt - a.savedAt);
-    setSavedItems(items);
-  }, []);
+    items.sort((a, b) => b.savedAt - a.savedAt)
+    setSavedItems(items)
+  }, [])
 
-  useEffect(() => {
-    if (loadTarget) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadSavedList();
-    }
-  }, [loadTarget, loadSavedList]);
+  // 用户点击"加载"按钮时直接拉取 + 打开面板
+  const openLoad = (target: LoadTarget) => {
+    void loadSavedList().then(() => setLoadTarget(target))
+  }
 
   const handleLoadItem = (item: SavedItem) => {
-    if (loadTarget === "left") setLeftCode(item.content);
-    else setRightCode(item.content);
-    setLoadTarget(null);
-  };
+    if (loadTarget === "left") setLeftCode(item.content)
+    else setRightCode(item.content)
+    setLoadTarget(null)
+  }
 
-  const leftLines = leftCode.split("\n").length;
-  const rightLines = rightCode.split("\n").length;
+  const leftLines = leftCode.split("\n").length
+  const rightLines = rightCode.split("\n").length
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground">
-      {/* Header */}
       <ToolHeader
         icon={GitCompareArrows}
         title="代码对比"
@@ -92,7 +92,7 @@ export function CodeCompare() {
               className="w-24"
               selectedKey={language}
               onSelectionChange={(key) => {
-                if (key) setLanguage(key as string);
+                if (key) setLanguage(key as (typeof LANGUAGES)[number]["id"])
               }}
             >
               <Select.Trigger>
@@ -113,7 +113,13 @@ export function CodeCompare() {
 
             <Tooltip delay={0}>
               <Tooltip.Trigger className="flex flex-col">
-                <Button isIconOnly size="sm" variant="ghost" aria-label="加载 A" onPress={() => setLoadTarget("left")}>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  aria-label="加载 A"
+                  onPress={() => openLoad("left")}
+                >
                   <FolderOpen size={14} />
                 </Button>
               </Tooltip.Trigger>
@@ -121,7 +127,13 @@ export function CodeCompare() {
             </Tooltip>
             <Tooltip delay={0}>
               <Tooltip.Trigger className="flex flex-col">
-                <Button isIconOnly size="sm" variant="ghost" aria-label="加载 B" onPress={() => setLoadTarget("right")}>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  aria-label="加载 B"
+                  onPress={() => openLoad("right")}
+                >
                   <FolderOpen size={14} />
                 </Button>
               </Tooltip.Trigger>
@@ -137,7 +149,6 @@ export function CodeCompare() {
         }
       />
 
-      {/* Main: MergeView */}
       <div className="flex-1 min-h-0">
         <DiffView
           leftValue={leftCode}
@@ -148,20 +159,21 @@ export function CodeCompare() {
         />
       </div>
 
-      {/* 从资源加载 Modal */}
       <LoadModal
         isOpen={!!loadTarget}
-        onOpenChange={(open) => { if (!open) setLoadTarget(null); }}
+        onOpenChangeAction={(open) => {
+          if (!open) setLoadTarget(null)
+        }}
         title={`加载到${loadTarget === "left" ? "左侧 (A)" : "右侧 (B)"}`}
         items={savedItems}
-        onLoad={handleLoadItem}
+        onLoadAction={handleLoadItem}
         emptyText="暂无保存的资源"
-        renderMeta={(item) => (
+        renderMetaAction={(item) => (
           <Chip size="sm" variant="soft" color="default">
             <Chip.Label className="text-xs">{item.toolName}</Chip.Label>
           </Chip>
         )}
       />
     </div>
-  );
+  )
 }

@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+build
+dist
+bun.lock
+public
+src/styles
+src/components/tiptap-templates
