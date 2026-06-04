@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button, Chip, Input, ListBox, Select, Spinner, Tabs, Tooltip, toast } from "@heroui/react"
 import { Check, Copy, Plus, Send, X } from "lucide-react"
 import { ToolHeader } from "@/components/ToolHeader"
@@ -36,6 +37,7 @@ type Method = (typeof METHODS)[number]
 const STORAGE_PREFIX = TOOL_REGISTRY["api-request"].prefix!
 
 export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
+  const router = useRouter()
   const [method, setMethod] = useState<Method>("GET")
   const [url, setUrl] = useState("")
   const [headers, setHeaders] = useState<Header[]>([
@@ -45,6 +47,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   const [response, setResponse] = useState<ResponseData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [loadingConfig, setLoadingConfig] = useState(false)
 
   const resource = useResource<RequestConfig>(STORAGE_PREFIX)
 
@@ -102,11 +105,13 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
     void (async () => {
       const item = await kvGet<RequestConfig>(STORAGE_PREFIX + initialLoadName)
       if (!item) return
+      setLoadingConfig(true)
       setMethod(item.method as Method)
       setUrl(item.url)
       setHeaders(item.headers.length ? item.headers : [{ key: "", value: "" }])
       setBody(item.body)
       resource.load(item)
+      setTimeout(() => setLoadingConfig(false), 0)
     })()
     // resource 是稳定对象，但此处只想依赖 initialLoadName
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,7 +198,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
     const next = [...headers]
     next[i] = { ...next[i], [field]: val }
     setHeaders(next)
-    resource.setDirty(true)
+    if (!loadingConfig) resource.setDirty(true)
   }
 
   const handleSave = async () => {
@@ -211,11 +216,16 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   }
 
   const handleLoad = (item: RequestConfig) => {
+    setLoadingConfig(true)
     const loaded = resource.load(item)
     setMethod(loaded.method as Method)
     setUrl(loaded.url)
     setHeaders(loaded.headers.length ? loaded.headers : [{ key: "", value: "" }])
     setBody(loaded.body)
+    // URL 同步，刷新后可恢复
+    router.push(`/tools/api-request?load=${encodeURIComponent(loaded.name)}`, { scroll: false })
+    // 下一个事件循环关闭 loadingConfig，让 onChange 可以正常工作
+    setTimeout(() => setLoadingConfig(false), 0)
   }
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
@@ -268,7 +278,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
               onChange={(key) => {
                 if (key) {
                   setMethod(key as Method)
-                  resource.setDirty(true)
+                  if (!loadingConfig) resource.setDirty(true)
                 }
               }}
             >
@@ -293,7 +303,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value)
-                resource.setDirty(true)
+                if (!loadingConfig) resource.setDirty(true)
               }}
             />
             <Button
@@ -347,7 +357,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                   value={body}
                   onChange={(v) => {
                     setBody(v)
-                    resource.setDirty(true)
+                    if (!loadingConfig) resource.setDirty(true)
                   }}
                   language="json"
                 />

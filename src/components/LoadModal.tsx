@@ -44,7 +44,6 @@ export function LoadModal<T extends LoadModalItem>({
       setDeleteTarget(null)
       return
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuery("")
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [isOpen])
