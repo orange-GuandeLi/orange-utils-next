@@ -247,6 +247,17 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
+  const handleNew = () => {
+    setMethod("GET")
+    setUrl("")
+    setHeaders([{ key: "Content-Type", value: "application/json" }])
+    setBody("")
+    setResponse(null)
+    setError("")
+    resource.reset()
+    router.push("/tools/api-request", { scroll: false })
+  }
+
   const [copied, setCopied] = useState(false)
   const handleCopyResponse = () => {
     if (!response) return
@@ -278,6 +289,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
             onSaveAction={handleSave}
             onSaveAsAction={handleSaveAs}
             onLoadAction={resource.openLoad}
+            onNewAction={handleNew}
             saveTooltip={resource.currentName ? `保存到 ${resource.currentName}` : "保存请求"}
           />
         }

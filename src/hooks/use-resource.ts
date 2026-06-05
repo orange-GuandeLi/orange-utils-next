@@ -96,6 +96,12 @@ export function useResource<T extends SavedItem>(prefix: string) {
     [prefix, currentName, refresh],
   )
 
+  // 重置状态（新建时清除 currentName 和 dirty）
+  const reset = useCallback(() => {
+    setCurrentName(null)
+    setDirty(false)
+  }, [])
+
   return {
     items,
     currentName,
@@ -113,6 +119,7 @@ export function useResource<T extends SavedItem>(prefix: string) {
     overwrite,
     load,
     remove,
+    reset,
     refresh,
   }
 }

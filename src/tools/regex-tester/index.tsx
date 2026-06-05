@@ -248,6 +248,16 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
+  const handleNew = () => {
+    setPattern("")
+    setFlags(new Set<FlagId>(["g"]))
+    setTestString("")
+    setMatches([])
+    setError(null)
+    resource.reset()
+    router.push("/tools/regex-tester", { scroll: false })
+  }
+
   const insertVar = (content: string) => {
     setTestString((prev) => prev + content)
     resource.setDirty(true)
@@ -271,6 +281,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
               onSaveAction={handleSave}
               onSaveAsAction={handleSaveAs}
               onLoadAction={resource.openLoad}
+              onNewAction={handleNew}
             />
           </>
         }

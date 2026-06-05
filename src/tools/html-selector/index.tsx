@@ -158,6 +158,16 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
+  const handleNew = () => {
+    setHtml(SAMPLE_HTML)
+    setPreviewHtml(SAMPLE_HTML)
+    setSelectMode(false)
+    setSelectedInfo(null)
+    setModalOpen(false)
+    resource.reset()
+    router.push("/tools/html-selector", { scroll: false })
+  }
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -201,6 +211,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
               onSaveAction={handleSave}
               onSaveAsAction={handleSaveAs}
               onLoadAction={resource.openLoad}
+              onNewAction={handleNew}
             />
             <Chip size="sm" variant="soft" color="default" className="font-mono">
               {previewPx}px

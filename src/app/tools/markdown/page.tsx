@@ -70,6 +70,12 @@ function MarkdownEditor() {
     router.push(`/tools/markdown?load=${encodeURIComponent(loaded.name)}`, { scroll: false })
   }
 
+  const handleNew = () => {
+    setContent("")
+    resource.reset()
+    router.push("/tools/markdown", { scroll: false })
+  }
+
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
 
   return (
@@ -85,6 +91,7 @@ function MarkdownEditor() {
             onSaveAction={handleSave}
             onSaveAsAction={handleSaveAs}
             onLoadAction={resource.openLoad}
+            onNewAction={handleNew}
           />
         }
       />

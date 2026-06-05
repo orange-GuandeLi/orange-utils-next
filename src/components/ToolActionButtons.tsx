@@ -1,7 +1,7 @@
 "use client"
 
 import { Button, Tooltip, Chip } from "@heroui/react"
-import { Save, FolderOpen, FileDown } from "lucide-react"
+import { Save, FolderOpen, FileDown, FilePlus } from "lucide-react"
 
 type ToolActionButtonsProps = {
   /** 当前加载的资源名称 */
@@ -14,6 +14,8 @@ type ToolActionButtonsProps = {
   onSaveAsAction: () => void
   /** 加载 */
   onLoadAction: () => void
+  /** 新建（清除当前加载的资源，回到空白状态） */
+  onNewAction?: () => void
   /** 保存按钮提示文本 */
   saveTooltip?: string
 }
@@ -24,6 +26,7 @@ export function ToolActionButtons({
   onSaveAction: onSave,
   onSaveAsAction: onSaveAs,
   onLoadAction: onLoad,
+  onNewAction: onNew,
   saveTooltip,
 }: ToolActionButtonsProps) {
   return (
@@ -37,6 +40,16 @@ export function ToolActionButtons({
         <Chip size="sm" variant="soft" color="warning">
           未保存
         </Chip>
+      )}
+      {currentName && onNew && (
+        <Tooltip delay={0}>
+          <Tooltip.Trigger className="flex flex-col">
+            <Button isIconOnly size="sm" variant="ghost" aria-label="新建" onPress={onNew}>
+              <FilePlus size={14} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>新建空白</Tooltip.Content>
+        </Tooltip>
       )}
       <Tooltip delay={0}>
         <Tooltip.Trigger className="flex flex-col">
