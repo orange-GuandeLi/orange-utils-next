@@ -34,6 +34,7 @@ import { kvDelete, kvGetAll, kvSet } from "@/utils/db"
 import { CodeEditor } from "@/components/CodeEditor"
 import { ModalShell } from "@/components/ModalShell"
 import { RESOURCE_CATEGORIES, type ToolDef } from "@/lib/tool-registry"
+import { useConfirm } from "@/contexts/ConfirmContext"
 
 type ResourceItem = {
   _key: string
@@ -71,6 +72,7 @@ function getPreviewLanguage(item: ResourceItem): "html" | "json" {
 
 export function ResourceManager() {
   const router = useRouter()
+  const { confirm } = useConfirm()
   const [allItems, setAllItems] = useState<ResourceItem[]>([])
   const [activeCategory, setActiveCategory] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -93,7 +95,6 @@ export function ResourceManager() {
     raw: Record<string, unknown>
   } | null>(null)
   const [busy, setBusy] = useState<null | "export" | "import" | "create">(null)
-  const [deleteTarget, setDeleteTarget] = useState<ResourceItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const categories: ToolDef[] = RESOURCE_CATEGORIES
@@ -144,19 +145,20 @@ export function ResourceManager() {
     return true
   })
 
-  const handleDelete = (item: ResourceItem) => {
-    setDeleteTarget(item)
-  }
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
-    await kvDelete(deleteTarget._key)
+  const handleDelete = async (item: ResourceItem) => {
+    const ok = await confirm({
+      title: "确认删除",
+      message: <>确定要删除「<span className="text-foreground font-medium">{item.name}</span>」吗？此操作不可撤销。</>,
+      confirmLabel: "删除",
+      variant: "danger",
+    })
+    if (!ok) return
+    await kvDelete(item._key)
     void loadAll()
-    if (detailItem?._key === deleteTarget._key) {
+    if (detailItem?._key === item._key) {
       setDetailOpen(false)
       setDetailItem(null)
     }
-    setDeleteTarget(null)
   }
 
   const handleCreate = async () => {
@@ -658,26 +660,6 @@ export function ResourceManager() {
             onPress={() => void handleImportConfirm("overwrite")}
           >
             {({ isPending }) => <>{isPending ? "覆盖中…" : "覆盖"}</>}
-          </Button>
-        </div>
-      </ModalShell>
-
-      <ModalShell
-        isOpen={!!deleteTarget}
-        onOpenChangeAction={(o) => { if (!o) setDeleteTarget(null) }}
-        title="确认删除"
-        icon={Trash2}
-        size="xs"
-      >
-        <p className="text-sm text-muted">
-          确定要删除「<span className="text-foreground font-medium">{deleteTarget?.name}</span>」吗？此操作不可撤销。
-        </p>
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="secondary" onPress={() => setDeleteTarget(null)}>
-            取消
-          </Button>
-          <Button variant="danger" onPress={() => void confirmDelete()}>
-            删除
           </Button>
         </div>
       </ModalShell>

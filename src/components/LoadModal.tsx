@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button, Tooltip, TextField, InputGroup, Label, Chip } from "@heroui/react"
 import { FolderOpen, Trash2, Search, X } from "lucide-react"
 import { ModalShell } from "./ModalShell"
+import { useConfirm } from "@/contexts/ConfirmContext"
 
 type LoadModalItem = {
   id?: string
@@ -35,17 +36,13 @@ export function LoadModal<T extends LoadModalItem>({
   toolName: defaultToolName,
 }: LoadModalProps<T>) {
   const [query, setQuery] = useState("")
-  const [deleteTarget, setDeleteTarget] = useState<T | null>(null)
+  const { confirm } = useConfirm()
   const inputRef = useRef<HTMLInputElement>(null)
 
   // 打开时清空搜索并聚焦
-  // isOpen 是父组件控制的弹窗状态，此处根据 isOpen 转移重置 query 是合理的副作用
   useEffect(() => {
-    if (!isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 关闭时重置是合理的副作用
-      setDeleteTarget(null)
-      return
-    }
+    if (!isOpen) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 打开时重置搜索是合理的副作用
     setQuery("")
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [isOpen])
@@ -127,7 +124,13 @@ export function LoadModal<T extends LoadModalItem>({
                         size="sm"
                         variant="ghost"
                         aria-label="删除"
-                        onPress={() => setDeleteTarget(item)}
+                        onPress={async () => {
+                          const ok = await confirm({
+                            message: <>确定要删除「<span className="text-foreground font-medium">{item.name}</span>」吗？</>,
+                            confirmLabel: "删除",
+                          })
+                          if (ok) onDelete?.(item)
+                        }}
                       >
                         <Trash2 size={14} className="text-danger" />
                       </Button>
@@ -141,31 +144,6 @@ export function LoadModal<T extends LoadModalItem>({
         </div>
       )}
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
-          <div className="bg-background rounded-lg shadow-lg p-4 max-w-xs w-full mx-4 border border-separator">
-            <p className="text-sm text-muted mb-4">
-              确定要删除「<span className="text-foreground font-medium">{deleteTarget.name}</span>
-              」吗？
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="secondary" onPress={() => setDeleteTarget(null)}>
-                取消
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                onPress={() => {
-                  onDelete?.(deleteTarget)
-                  setDeleteTarget(null)
-                }}
-              >
-                删除
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </ModalShell>
   )
 }
