@@ -1,7 +1,7 @@
 "use client"
 
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Tooltip, TextField, InputGroup, Label } from "@heroui/react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Button, Tooltip, TextField, InputGroup, Label, Chip } from "@heroui/react"
 import { FolderOpen, Trash2, Search, X } from "lucide-react"
 import { ModalShell } from "./ModalShell"
 
@@ -9,6 +9,7 @@ type LoadModalItem = {
   id?: string
   name: string
   savedAt: number
+  toolName?: string
 }
 
 type LoadModalProps<T extends LoadModalItem> = {
@@ -19,7 +20,8 @@ type LoadModalProps<T extends LoadModalItem> = {
   onLoadAction: (item: T) => void
   onDeleteAction?: (item: T) => void
   emptyText?: string
-  renderMetaAction?: (item: T) => ReactNode
+  /** 默认来源标签，item.toolName 优先 */
+  toolName?: string
 }
 
 export function LoadModal<T extends LoadModalItem>({
@@ -30,7 +32,7 @@ export function LoadModal<T extends LoadModalItem>({
   onLoadAction: onLoad,
   onDeleteAction: onDelete,
   emptyText = "暂无保存的内容",
-  renderMetaAction: renderMeta,
+  toolName: defaultToolName,
 }: LoadModalProps<T>) {
   const [query, setQuery] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null)
@@ -88,7 +90,7 @@ export function LoadModal<T extends LoadModalItem>({
           {query.trim() ? "没有匹配的资源" : emptyText}
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
           {filtered.map((item) => (
             <div
               key={item.id || item.name}
@@ -101,11 +103,17 @@ export function LoadModal<T extends LoadModalItem>({
               }}
             >
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{item.name}</div>
+                <div className="flex items-center gap-2">
+                  {(item.toolName || defaultToolName) && (
+                    <Chip size="sm" variant="soft" color="default">
+                      {item.toolName || defaultToolName}
+                    </Chip>
+                  )}
+                  <span className="text-sm font-medium truncate">{item.name}</span>
+                </div>
                 <div className="text-xs text-muted mt-0.5">
                   {new Date(item.savedAt).toLocaleString("zh-CN")}
                 </div>
-                {renderMeta && <div className="mt-1">{renderMeta(item)}</div>}
               </div>
               {onDelete && (
                 <div

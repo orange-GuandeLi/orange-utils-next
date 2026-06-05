@@ -115,6 +115,7 @@ function NotesEditor() {
         onLoadAction={handleLoad}
         onDeleteAction={resource.remove}
         emptyText="暂无保存的Markdown"
+        toolName="Markdown"
       />
     </div>
   )

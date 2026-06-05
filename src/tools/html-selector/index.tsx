@@ -361,6 +361,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
         onLoadAction={handleLoad}
         onDeleteAction={resource.remove}
         emptyText="暂无保存的代码"
+        toolName="HTML 选择器"
       />
     </div>
   )

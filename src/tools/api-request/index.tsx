@@ -497,11 +497,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
         onLoadAction={handleLoad}
         onDeleteAction={resource.remove}
         emptyText="暂无保存的请求"
-        renderMetaAction={(item) => (
-          <span className="text-xs font-mono text-muted">
-            {item.method} {item.url}
-          </span>
-        )}
+        toolName="API 请求"
       />
 
       <ModalShell

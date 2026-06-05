@@ -182,11 +182,6 @@ export function CodeCompare() {
         items={savedItems}
         onLoadAction={handleLoadItem}
         emptyText="暂无保存的资源"
-        renderMetaAction={(item) => (
-          <Chip size="sm" variant="soft" color="default">
-            {item.toolName}
-          </Chip>
-        )}
       />
     </div>
   )

@@ -430,6 +430,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
         onLoadAction={handleLoad}
         onDeleteAction={resource.remove}
         emptyText="暂无保存的正则"
+        toolName="正则测试"
       />
 
       <ModalShell
