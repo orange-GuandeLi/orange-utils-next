@@ -48,18 +48,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const handleCancel = useCallback(() => {
-    setIsOpen(false)
-    resolverRef.current?.(false)
-    resolverRef.current = null
-  }, [])
-
-  const handleConfirm = useCallback(() => {
-    setIsOpen(false)
-    resolverRef.current?.(true)
-    resolverRef.current = null
-  }, [])
-
   const variant = options.variant ?? "danger"
   const cfg = VARIANT_CONFIG[variant]
   const Icon = cfg.icon
@@ -71,30 +59,34 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <AlertDialog.Backdrop>
           <AlertDialog.Container size="xs">
             <AlertDialog.Dialog>
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon className="bg-accent-soft text-accent-soft-foreground">
-                  <Icon className="size-5" />
-                </AlertDialog.Icon>
-                <AlertDialog.Heading>
-                  {options.title ?? cfg.heading}
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                {typeof options.message === "string" ? (
-                  <p className="text-sm text-muted">{options.message}</p>
-                ) : (
-                  options.message
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="secondary" onPress={handleCancel}>
-                  {options.cancelLabel ?? "取消"}
-                </Button>
-                <Button variant={variant === "danger" ? "danger" : variant === "warning" ? "danger-soft" : "primary"} onPress={handleConfirm}>
-                  {options.confirmLabel ?? "确认"}
-                </Button>
-              </AlertDialog.Footer>
+              {({ close }) => (
+                <>
+                  <AlertDialog.CloseTrigger />
+                  <AlertDialog.Header>
+                    <AlertDialog.Icon className="bg-accent-soft text-accent-soft-foreground">
+                      <Icon className="size-5" />
+                    </AlertDialog.Icon>
+                    <AlertDialog.Heading>
+                      {options.title ?? cfg.heading}
+                    </AlertDialog.Heading>
+                  </AlertDialog.Header>
+                  <AlertDialog.Body>
+                    {typeof options.message === "string" ? (
+                      <p className="text-sm text-muted">{options.message}</p>
+                    ) : (
+                      options.message
+                    )}
+                  </AlertDialog.Body>
+                  <AlertDialog.Footer>
+                    <Button variant="secondary" onPress={() => { resolverRef.current?.(false); resolverRef.current = null; close() }}>
+                      {options.cancelLabel ?? "取消"}
+                    </Button>
+                    <Button variant={variant === "danger" ? "danger" : variant === "warning" ? "danger-soft" : "primary"} onPress={() => { resolverRef.current?.(true); resolverRef.current = null; close() }}>
+                      {options.confirmLabel ?? "确认"}
+                    </Button>
+                  </AlertDialog.Footer>
+                </>
+              )}
             </AlertDialog.Dialog>
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
