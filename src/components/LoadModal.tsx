@@ -97,7 +97,7 @@ export function LoadModal<T extends LoadModalItem>({
               className="group flex items-center gap-3 p-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary transition-colors cursor-pointer"
               onClick={() => onLoad(item)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onLoad(item)
+                if ((e.key === "Enter" || e.key === " ") && !e.nativeEvent.isComposing) onLoad(item)
               }}
             >
               <div className="flex-1 min-w-0">

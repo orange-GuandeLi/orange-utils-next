@@ -56,7 +56,7 @@ export function SaveModal({
           <Label>名称</Label>
           <Input
             placeholder={placeholder}
-            onKeyDown={(e) => e.key === "Enter" && !showError && onSave()}
+            onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && !showError && onSave()}
             onBlur={() => setTouched(true)}
           />
           {showError ? (

@@ -50,7 +50,16 @@ export const TOOL_REGISTRY: Record<ToolId, ToolDef> = {
     icon: Send,
     prefix: "api-request:saved:",
     href: "/tools/api-request",
-    extractContent: () => "",
+    extractContent: (v) => {
+      const parts: string[] = []
+      if (v.method) parts.push(`${v.method} ${v.url || ""}`)
+      if (v.headers && Array.isArray(v.headers)) {
+        const h = v.headers as { key: string; value: string }[]
+        h.filter(x => x.key).forEach(x => parts.push(`${x.key}: ${x.value}`))
+      }
+      if (v.body) parts.push("", v.body as string)
+      return parts.join("\n")
+    },
     extractMeta: (v) => ({ method: v.method as string, url: v.url as string }),
   },
   "code-compare": {

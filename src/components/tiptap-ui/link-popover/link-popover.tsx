@@ -115,7 +115,7 @@ const LinkMain: React.FC<LinkMainProps> = ({
   const isMobile = useIsBreakpoint()
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !event.nativeEvent.isComposing) {
       event.preventDefault()
       setLink()
     }

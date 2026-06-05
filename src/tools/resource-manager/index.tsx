@@ -57,6 +57,18 @@ function iconFor(id: string) {
   return (ICON_MAP as Record<string, typeof Database>)[id] ?? Database
 }
 
+/** 从资源项中获取可预览的内容（兼容不同工具的存储结构） */
+function getPreviewContent(item: ResourceItem): string {
+  const any = item as Record<string, unknown>
+  return (any.content as string) || (any.body as string) || (any.html as string) || (any.testString as string) || ""
+}
+
+/** 获取预览内容的语言类型 */
+function getPreviewLanguage(item: ResourceItem): "html" | "json" {
+  if (item._categoryId === "api-request") return "json"
+  return "html"
+}
+
 export function ResourceManager() {
   const router = useRouter()
   const [allItems, setAllItems] = useState<ResourceItem[]>([])
@@ -65,6 +77,10 @@ export function ResourceManager() {
 
   const [detailItem, setDetailItem] = useState<ResourceItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editContent, setEditContent] = useState("")
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState("")
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [newName, setNewName] = useState("")
@@ -454,27 +470,118 @@ export function ResourceManager() {
 
       <ModalShell
         isOpen={detailOpen}
-        onOpenChangeAction={setDetailOpen}
+        onOpenChangeAction={(open) => {
+          setDetailOpen(open)
+          if (!open) { setEditMode(false); setRenaming(false) }
+        }}
         title={detailItem?.name || "资源详情"}
-        icon={Eye}
+        icon={editMode ? PenTool : Eye}
         size="lg"
       >
+        {renaming && detailItem && (
+          <div className="flex items-center gap-2 mb-3">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && renameValue.trim()) {
+                  const oldKey = detailItem._key
+                  const newKey = oldKey.replace(/[^:]+$/, renameValue.trim())
+                  const item = { ...detailItem, name: renameValue.trim() }
+                  await kvSet(newKey, item)
+                  if (newKey !== oldKey) await kvDelete(oldKey)
+                  setRenaming(false)
+                  void loadAll()
+                  toast.success("已重命名")
+                  setDetailOpen(false)
+                }
+                if (e.key === "Escape") setRenaming(false)
+              }}
+              autoFocus
+              className="flex-1"
+            />
+            <Button size="sm" variant="primary" onPress={async () => {
+              if (!renameValue.trim()) return
+              const oldKey = detailItem._key
+              const newKey = oldKey.replace(/[^:]+$/, renameValue.trim())
+              const item = { ...detailItem, name: renameValue.trim() }
+              await kvSet(newKey, item)
+              if (newKey !== oldKey) await kvDelete(oldKey)
+              setRenaming(false)
+              void loadAll()
+              toast.success("已重命名")
+              setDetailOpen(false)
+            }}>确认</Button>
+          </div>
+        )}
         <div className="max-h-80 min-h-40 h-auto">
-          <CodeEditor value={detailItem?.content || ""} language="html" readOnly />
+          <CodeEditor
+            value={editMode ? editContent : (detailItem ? getPreviewContent(detailItem) : "")}
+            onChange={editMode ? setEditContent : undefined}
+            language={detailItem ? getPreviewLanguage(detailItem) : "html"}
+            readOnly={!editMode}
+          />
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <Button variant="secondary" onPress={() => setDetailOpen(false)}>
-            关闭
+          <Button variant="secondary" onPress={() => {
+            if (editMode) { setEditMode(false) }
+            else if (renaming) { setRenaming(false) }
+            else { setDetailOpen(false) }
+          }}>
+            {editMode || renaming ? "取消" : "关闭"}
           </Button>
-          {detailItem && (
+          {detailItem && !editMode && !renaming && (
+            <>
+              <Button
+                variant="secondary"
+                onPress={() => {
+                  setRenameValue(detailItem.name)
+                  setRenaming(true)
+                }}
+              >
+                重命名
+              </Button>
+              <Button
+                variant="secondary"
+                onPress={() => {
+                  setEditContent(getPreviewContent(detailItem))
+                  setEditMode(true)
+                }}
+              >
+                编辑
+              </Button>
+              <Button
+                variant="danger"
+                onPress={() => {
+                  handleDelete(detailItem)
+                  setDetailOpen(false)
+                  setEditMode(false)
+                }}
+              >
+                删除
+              </Button>
+            </>
+          )}
+          {detailItem && editMode && (
             <Button
-              variant="danger"
-              onPress={() => {
-                handleDelete(detailItem)
-                setDetailOpen(false)
+              variant="primary"
+              onPress={async () => {
+                const updated = { ...detailItem }
+                // 写回对应的字段
+                const any = updated as Record<string, unknown>
+                if ("content" in any) any.content = editContent
+                else if ("body" in any) any.body = editContent
+                else if ("html" in any) any.html = editContent
+                else if ("testString" in any) any.testString = editContent
+                else any.content = editContent
+                updated.savedAt = Date.now()
+                await kvSet(detailItem._key, updated)
+                setEditMode(false)
+                void loadAll()
+                toast.success("已保存")
               }}
             >
-              删除
+              保存
             </Button>
           )}
         </div>

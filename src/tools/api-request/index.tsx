@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button, Chip, Input, ListBox, Select, Spinner, Tabs, Tooltip, toast } from "@heroui/react"
-import { Check, Copy, Plus, Send, X } from "lucide-react"
+import { AlignLeft, Check, Copy, Plus, Send, X } from "lucide-react"
 import { ToolHeader } from "@/components/ToolHeader"
 import { ToolActionButtons } from "@/components/ToolActionButtons"
 import { LoadModal } from "@/components/LoadModal"
@@ -123,9 +123,26 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
     let match: RegExpExecArray | null
     pattern.lastIndex = 0
     while ((match = pattern.exec(text)) !== null) {
-      const value = await kvGet<string>(match[1])
-      if (value !== undefined) {
-        result = result.replace(match[0], typeof value === "string" ? value : JSON.stringify(value))
+      const rawKey = match[1]
+      // 支持 {{key.field}} 语法：key 是 IndexedDB 的存储键，field 是对象字段
+      const dotIdx = rawKey.lastIndexOf(".")
+      const dbKey = dotIdx > 0 ? rawKey.slice(0, dotIdx) : rawKey
+      const field = dotIdx > 0 ? rawKey.slice(dotIdx + 1) : null
+      const stored = await kvGet<Record<string, unknown>>(dbKey)
+      if (stored !== undefined) {
+        let value: unknown
+        if (field && typeof stored === "object" && stored !== null) {
+          value = (stored as Record<string, unknown>)[field]
+        } else {
+          value = stored
+        }
+        if (value !== undefined) {
+          const str = typeof value === "string" ? value : JSON.stringify(value)
+          // JSON.stringify 处理所有特殊字符转义，slice 去掉外层引号
+          const escaped = JSON.stringify(str).slice(1, -1)
+          // 用函数替换避免 $1/$&/$' 等 String.replace 特殊模式
+          result = result.replace(match[0], () => escaped)
+        }
       }
     }
     return result
@@ -344,6 +361,21 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
             <Tabs.Panel id="body" className="flex flex-col h-full mt-0">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-separator bg-surface-secondary shrink-0">
                 <span className="text-xs text-muted">JSON 请求体</span>
+              <div className="flex items-center gap-1">
+                <Tooltip delay={0}>
+                  <Button size="sm" variant="ghost" onPress={() => {
+                    try {
+                      setBody(JSON.stringify(JSON.parse(body), null, 2))
+                      resource.setDirty(true)
+                    } catch {
+                      toast("JSON 格式错误，无法格式化", { variant: "danger" })
+                    }
+                  }}>
+                    <AlignLeft size={12} />
+                    <span className="text-xs">格式化</span>
+                  </Button>
+                  <Tooltip.Content>美化 JSON 格式</Tooltip.Content>
+                </Tooltip>
                 <Tooltip delay={0}>
                   <Button size="sm" variant="ghost" onPress={openVarModal}>
                     <Plus size={12} />
@@ -351,6 +383,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
                   </Button>
                   <Tooltip.Content>从其他工具插入数据</Tooltip.Content>
                 </Tooltip>
+              </div>
               </div>
               <div className="flex-1 min-h-0">
                 <CodeEditor

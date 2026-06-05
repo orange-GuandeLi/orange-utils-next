@@ -16,6 +16,8 @@ import {
   bracketMatching,
   foldGutter,
 } from "@codemirror/language"
+import { linter, lintGutter } from "@codemirror/lint"
+import { jsonParseLinter } from "@codemirror/lang-json"
 
 const lightTheme = EditorView.theme({
   "&": { height: "100%", fontSize: "13px", backgroundColor: "#ffffff" },
@@ -62,6 +64,12 @@ export function CodeEditor({ value, onChange, language = "html", readOnly = fals
       lightTheme,
       keymap.of([...defaultKeymap, ...historyKeymap]),
     ]
+
+    // JSON 模式：实时语法错误检测
+    if (language === "json") {
+      extensions.push(linter(jsonParseLinter(), { delay: 300 }))
+      extensions.push(lintGutter())
+    }
 
     if (!readOnly) {
       extensions.push(
