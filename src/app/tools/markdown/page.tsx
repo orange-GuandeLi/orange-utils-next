@@ -9,6 +9,7 @@ import { ToolHeader } from "@/components/ToolHeader"
 import { ToolActionButtons } from "@/components/ToolActionButtons"
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning"
 import { kvGet } from "@/utils/db"
 import { TOOL_REGISTRY } from "@/lib/tool-registry"
 import { toast } from "@heroui/react"
@@ -36,6 +37,7 @@ function MarkdownEditor() {
   const searchParams = useSearchParams()
   const [content, setContent] = useState("")
   const resource = useResource<MarkdownSaved>(STORAGE_PREFIX)
+  useUnsavedWarning(resource.dirty)
 
   // URL 参数加载
   useEffect(() => {

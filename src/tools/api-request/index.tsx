@@ -11,6 +11,7 @@ import { SaveModal } from "@/components/SaveModal"
 import { ModalShell } from "@/components/ModalShell"
 import { CodeEditor } from "@/components/CodeEditor"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning"
 import { kvGet, kvGetAll } from "@/utils/db"
 import { TOOL_NAME_LABELS, TOOL_REGISTRY } from "@/lib/tool-registry"
 
@@ -50,6 +51,7 @@ export function ApiRequest({ initialLoadName }: { initialLoadName?: string }) {
   const [loadingConfig, setLoadingConfig] = useState(false)
 
   const resource = useResource<RequestConfig>(STORAGE_PREFIX)
+  useUnsavedWarning(resource.dirty)
 
   const [varModalOpen, setVarModalOpen] = useState(false)
   const [availableVars, setAvailableVars] = useState<

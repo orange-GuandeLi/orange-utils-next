@@ -12,6 +12,7 @@ import { ModalShell } from "@/components/ModalShell"
 import { CodeEditor } from "@/components/CodeEditor"
 import { useIframeSelector, type SelectionInfo } from "./hooks/useIframeSelector"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning"
 import { kvGet } from "@/utils/db"
 import { TOOL_REGISTRY } from "@/lib/tool-registry"
 
@@ -73,6 +74,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
 
   const router = useRouter()
   const resource = useResource<HtmlSelectorSaved>(STORAGE_PREFIX)
+  useUnsavedWarning(resource.dirty)
 
   const updatePreviewWidth = useCallback(() => {
     if (!containerRef.current) return

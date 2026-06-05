@@ -15,6 +15,7 @@ import {
 } from "@heroui/react"
 import { Check, Copy, Plus, Regex } from "lucide-react"
 import { useResource, type SavedItem } from "@/hooks/use-resource"
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning"
 import { LoadModal } from "@/components/LoadModal"
 import { SaveModal } from "@/components/SaveModal"
 import { ToolHeader } from "@/components/ToolHeader"
@@ -58,6 +59,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
 
   const router = useRouter()
   const resource = useResource<RegexSaved>(STORAGE_PREFIX)
+  useUnsavedWarning(resource.dirty)
 
   const [varModalOpen, setVarModalOpen] = useState(false)
   const [availableVars, setAvailableVars] = useState<
