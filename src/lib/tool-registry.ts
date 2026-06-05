@@ -14,7 +14,7 @@ export type ToolId =
   | "api-request"
   | "code-compare"
   | "regex-tester"
-  | "notes"
+  | "markdown"
   | "resource-manager"
   | "manual"
 
@@ -79,12 +79,12 @@ export const TOOL_REGISTRY: Record<ToolId, ToolDef> = {
     href: "/tools/regex-tester",
     extractContent: (v) => (v.pattern as string) || "",
   },
-  notes: {
-    id: "notes",
+  markdown: {
+    id: "markdown",
     name: "Markdown",
     description: "富文本 Markdown 编辑器",
     icon: FileCode,
-    prefix: "notes:saved:",
+    prefix: "markdown:saved:",
     href: "/tools/markdown",
     extractContent: (v) => (v.content as string) || "",
   },
@@ -113,7 +113,7 @@ export const SIDEBAR_TOOLS: ToolDef[] = [
   TOOL_REGISTRY["api-request"],
   TOOL_REGISTRY["code-compare"],
   TOOL_REGISTRY["regex-tester"],
-  TOOL_REGISTRY.notes,
+  TOOL_REGISTRY.markdown,
 ]
 
 export const SYSTEM_TOOLS: ToolDef[] = [TOOL_REGISTRY["resource-manager"]]
@@ -123,7 +123,7 @@ export const RESOURCE_CATEGORIES: ToolDef[] = [
   TOOL_REGISTRY["html-selector"],
   TOOL_REGISTRY["api-request"],
   TOOL_REGISTRY["regex-tester"],
-  TOOL_REGISTRY.notes,
+  TOOL_REGISTRY.markdown,
   TOOL_REGISTRY.manual,
 ]
 

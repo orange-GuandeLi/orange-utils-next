@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Button,
   Chip,
@@ -55,6 +56,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
   const [matches, setMatches] = useState<MatchResult[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  const router = useRouter()
   const resource = useResource<RegexSaved>(STORAGE_PREFIX)
 
   const [varModalOpen, setVarModalOpen] = useState(false)
@@ -241,6 +243,7 @@ export function RegexTester({ initialLoadName }: { initialLoadName?: string }) {
     setPattern(loaded.pattern)
     setFlags(new Set(loaded.flags as FlagId[]))
     setTestString(loaded.testString)
+    router.push(`/tools/regex-tester?load=${encodeURIComponent(loaded.name)}`, { scroll: false })
   }
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")

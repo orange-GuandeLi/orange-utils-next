@@ -50,7 +50,7 @@ const ICON_MAP = {
   "html-selector": Code2,
   "api-request": Send,
   "regex-tester": Regex,
-  notes: FileCode,
+  markdown: FileCode,
   manual: PenTool,
 } as const
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { FileCode } from "lucide-react"
 import { LoadModal } from "@/components/LoadModal"
 import { SaveModal } from "@/components/SaveModal"
@@ -13,35 +13,36 @@ import { kvGet } from "@/utils/db"
 import { TOOL_REGISTRY } from "@/lib/tool-registry"
 import { toast } from "@heroui/react"
 
-type NoteSaved = SavedItem & {
+type MarkdownSaved = SavedItem & {
   content: string
 }
 
-const STORAGE_PREFIX = TOOL_REGISTRY.notes.prefix!
+const STORAGE_PREFIX = TOOL_REGISTRY.markdown.prefix!
 
-export default function NotesPage() {
+export default function MarkdownPage() {
   return (
     <Suspense
       fallback={
         <div className="h-full flex items-center justify-center text-muted text-sm">加载中...</div>
       }
     >
-      <NotesEditor />
+      <MarkdownEditor />
     </Suspense>
   )
 }
 
-function NotesEditor() {
+function MarkdownEditor() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [content, setContent] = useState("")
-  const resource = useResource<NoteSaved>(STORAGE_PREFIX)
+  const resource = useResource<MarkdownSaved>(STORAGE_PREFIX)
 
   // URL 参数加载
   useEffect(() => {
     const name = searchParams.get("load")
     if (!name) return
     void (async () => {
-      const item = await kvGet<NoteSaved>(STORAGE_PREFIX + name)
+      const item = await kvGet<MarkdownSaved>(STORAGE_PREFIX + name)
       if (!item) return
       setContent(item.content)
       resource.load(item)
@@ -51,7 +52,7 @@ function NotesEditor() {
 
   const handleSave = async () => {
     if (resource.currentName) {
-      const ok = await resource.overwrite({ content } as NoteSaved)
+      const ok = await resource.overwrite({ content } as MarkdownSaved)
       if (ok) toast.success(`已保存「${resource.currentName}」`)
     } else {
       resource.openSave()
@@ -59,13 +60,14 @@ function NotesEditor() {
   }
 
   const handleSaveConfirm = async () => {
-    const name = await resource.save({ content } as NoteSaved)
+    const name = await resource.save({ content } as MarkdownSaved)
     if (name) toast.success(`已保存「${name}」`)
   }
 
-  const handleLoad = (item: NoteSaved) => {
+  const handleLoad = (item: MarkdownSaved) => {
     const loaded = resource.load(item)
     setContent(loaded.content)
+    router.push(`/tools/markdown?load=${encodeURIComponent(loaded.name)}`, { scroll: false })
   }
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button, Chip, Toolbar, Tooltip, toast } from "@heroui/react"
 import { Check, Code2, Copy, Eye, GripVertical, SquareDashedMousePointer } from "lucide-react"
 import { ToolHeader } from "@/components/ToolHeader"
@@ -70,6 +71,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewPx, setPreviewPx] = useState(0)
 
+  const router = useRouter()
   const resource = useResource<HtmlSelectorSaved>(STORAGE_PREFIX)
 
   const updatePreviewWidth = useCallback(() => {
@@ -151,6 +153,7 @@ export function HtmlSelector({ initialLoadName }: { initialLoadName?: string }) 
     setSelectMode(false)
     setSelectedInfo(null)
     setModalOpen(false)
+    router.push(`/tools/html-selector?load=${encodeURIComponent(loaded.name)}`, { scroll: false })
   }
 
   const handleSaveAs = () => resource.openSave(resource.currentName ?? "")
